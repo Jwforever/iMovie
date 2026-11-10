@@ -35,7 +35,7 @@
 
 ## 构建证据
 
-2026-11-10 最终通过的完整 macOS 构建记录：[GitHub Actions 42801236882](https://github.com/Jwforever/iMovie/actions/runs/42801236882)，对应提交 `578f84406c70d5b199fad23adfc92670de243034`。这是私有仓库，需使用仓库所有者账号查看。最终交付构建信息见 `dist/build-info.json`。
+2026-11-10 最终通过的完整 macOS 构建记录：[GitHub Actions 42803822395](https://github.com/Jwforever/iMovie/actions/runs/42803822395)，对应提交 `5aefc6fe66c9572e315f2ee3fbdc2e6d4e00f685`。这是私有仓库，需使用仓库所有者账号查看。最终交付构建信息见 `dist/build-info.json`。
 
 本地 `dist/screenshots/` 保存从 Xcode xcresult 导出的截图。其中 `11-dm84-system-playing.png` 可见真实来源的解码画面，`07-user-config-imported.png` 显示配置与来源数量。测试使用的演示片库和生成视频仅在测试环境运行，不打包进 IPA。
 
