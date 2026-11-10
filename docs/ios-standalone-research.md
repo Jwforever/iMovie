@@ -106,16 +106,34 @@ README 标示可侧载 iOS 版；源码中的 Apple 实现使用 headless WebVie
 
 全过程未使用 Android、自建解析服务器、云端自建函数或原 drpy 引擎。详细实测在 `native-source-probe.json`。
 
-这证明该源可以使用普通 HTTP / HTML 逻辑实现本机适配。**实验运行在当前 Windows 的 Python 环境，并使用 iPhone User-Agent；尚未验证 Swift 代码、iOS 网络环境、完整视频、解码或播放控制。**
+这证明该源可以使用普通 HTTP / HTML 逻辑实现本机适配。**兔小贝网络实验运行在 Windows 的 Python 环境，尚未完成该源的 iOS 播放验证；Swift 适配代码已通过 Xcode 编译和对应单元测试。**
 
 配套 Swift 适配已写入 `Sources/Core/TuxiaobeiAdapter.swift`，导入原配置后按已知规则地址识别为“本机适配·实验”。如果网站结构变化，会报告失败；不会静默把未知源认作已适配。
 
-这只是一个公开来源的可行性样例，不能当作用户所需电影电视剧已完成。本次尝试原配置中立播网站主页时，当前电脑遇到证书链验证失败；未绕过证书检查，未验证该源的完整采集和播放。
+这只是一个公开来源的可行性样例。立播的实验适配也已写入，但 Windows 访问遇到证书链错误，macOS 云端访问配置内域名返回 HTTP 403；未绕过证书检查，未验证该源的完整采集和播放。
+
+## 0.2.0 已完成的 iOS 播放验证
+
+使用 SwiftSoup、URLSession、WKWebView 和 AVPlayer 为动漫巴士独立编写适配，识别原配置的 `csp_Dm84Guard`，不运行该 Android 插件。
+
+在 Xcode 16.4 的 iPhone 16 / iOS 18.5 模拟器中，已实际完成：
+
+1. 直接请求用户的 `http://www.饭太硬.cc/tv`，导入 48 个点播条目和 6 个直播列表。
+2. 选中动漫巴士，搜索「神厨狂后」。
+3. 读取详情和选集，打开第 12 集。
+4. 在本机 WKWebView 内执行网站播放页面，识别 iframe 的 HLS 媒体地址。
+5. 点击「系统播放」，AVPlayer 进入 `timeControlStatus == .playing`，截图可见解码后的画面。
+
+该流程已作为自动化 UI 测试运行通过。另有本地生成视频的配置导入、播放、收藏重播和网页切换系统播放测试。完整证据见 [验证记录](validation.md)。
+
+B站适配覆盖原配置 7 个同类条目，使用公开搜索、详情、分 P 和公开单文件播放接口。Windows 网络探测的媒体样本返回 HTTP 206 / video/mp4 / ftyp；登录、会员、DASH 和多段合并未实现，尚未完成该源的 iOS 播放测试。
+
+当前设置内识别到 10 个本机实验条目，包括动漫巴士 1、B站 7、兔小贝 1、立播 1；其余 36 个 Android 条目与 2 个 drpy 条目尚未适配。识别数量与逐站验证数量需要分别看待。
 
 ## 本项目后续开发方向
 
-采用 iPhone 本机架构：Swift 网络层、来源适配接口、JavaScriptCore 规则执行、WKWebView 页面处理、系统播放器。没有证据说明需要要求用户购买 Android 设备。
+采用 iPhone 本机架构：Swift 网络层、来源适配接口、WKWebView 页面处理和系统播放器。JavaScriptCore / drpy 完整宿主属于后续扩展，目前未实现。没有证据说明需要要求用户购买 Android 设备。
 
-下一步先完成一个实际需要的影视站点的“搜索 → 详情 → 选集 → 媒体播放”闭环，再扩展 JS 宿主和更多站点。每个源需要独立验证，不承诺原 Guard 包全部无改动兼容。
+动漫巴士的“搜索 → 详情 → 选集 → 媒体播放”模拟器闭环已完成。后续需要实体 iPhone 验证，并扩展电影电视剧网站、JS 宿主及其他来源。每个源需要独立验证，不承诺原 Guard 包全部无改动兼容。
 
-iOS 本机运行和 IPA 编译是两个问题：App 运行不需要 Mac；生成 IPA 仍需 macOS 上的 Xcode / Apple SDK，可使用云构建。当前尚未触发云构建、生成 IPA 或进行真机验证。
+iOS 本机运行和 IPA 编译是两个问题：App 运行不需要 Mac；生成 IPA 需要 macOS 的 Xcode / Apple SDK。本项目已在用户的 GitHub 私有仓库用 macOS runner 编译 iPhoneOS arm64 Release 应用，并生成未签名 IPA；签名与实体 iPhone 安装尚未验证。
