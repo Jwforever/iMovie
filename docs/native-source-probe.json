@@ -1,0 +1,58 @@
+{
+  "checked_at": "2026-11-10T15:34:42+08:00",
+  "config": {
+    "url": "http://www.饭太硬.cc/tv",
+    "status": 200
+  },
+  "source": {
+    "key": "dr_兔小贝",
+    "name": "📚儿童┃启蒙",
+    "adapter": "tuxiaobei",
+    "website": "https://www.tuxiaobei.com"
+  },
+  "environment": {
+    "used_android": false,
+    "used_custom_server": false,
+    "ran_ios_app": false,
+    "ran_original_drpy": false
+  },
+  "category": {
+    "status": 200,
+    "content_type": "application/javascript; charset=UTF-8",
+    "content_range": null,
+    "bytes_read": 11228,
+    "items": 30,
+    "sample_id": "2376",
+    "sample_title": "笑猫之歌"
+  },
+  "search": {
+    "status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "content_range": null,
+    "bytes_read": 8441,
+    "query": "小星星",
+    "unique_result_count": 2
+  },
+  "detail": {
+    "status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "content_range": null,
+    "bytes_read": 48167,
+    "public_media_extracted": true
+  },
+  "media_probe": {
+    "status": 206,
+    "content_type": "video/mp4",
+    "content_range": "bytes 0-1023/11121315",
+    "bytes_read": 1024,
+    "host": "resource-cdn.tuxiaobei.com",
+    "iso_bmff_ftyp": true,
+    "first_1k_sha256": "978853ffec27d8b3ddac4d5b4ce1b9e363ece2da065233345ba82d71d0adc0d1",
+    "full_video_downloaded": false
+  },
+  "limits": [
+    "This probes the public site's HTTP path using an iPhone User-Agent; it does not run Swift or iOS.",
+    "A readable MP4 prefix does not verify full video playback, seeking, audio or codec compatibility.",
+    "The source is a feasibility sample; it does not demonstrate the 45 Android spiders or a complete drpy engine."
+  ]
+}

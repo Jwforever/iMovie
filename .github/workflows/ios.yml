@@ -1,0 +1,29 @@
+name: Build unsigned iOS app
+"on":
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew list xcodegen || brew install xcodegen
+      - name: Test and build
+        run: bash scripts/build-unsigned.sh
+      - name: Unit test report
+        if: always()
+        run: git status --short
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: iMovie-unsigned-ipa
+          path: |
+            dist/*.ipa
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 7

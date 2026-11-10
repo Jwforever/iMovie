@@ -1,0 +1,435 @@
+{
+  "checked_at": "2026-11-10T15:38:06+08:00",
+  "source": "http://www.饭太硬.cc/tv",
+  "response": {
+    "url": "http://www.xn--sss604efuw.cc/tv",
+    "status": 200,
+    "content_type": "image/x-ms-bmp",
+    "bytes": 19951
+  },
+  "encoding": "image**Base64",
+  "site_count": 48,
+  "runtime_counts": {
+    "android": 45,
+    "javascript": 3
+  },
+  "live_source_count": 6,
+  "sites": [
+    {
+      "key": "点我切源",
+      "name": "豆豆┃片单 <兼容安卓4>",
+      "type": 3,
+      "api": "csp_DouDouGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "MDrive",
+      "name": "🗂我的云盘┃配置",
+      "type": 3,
+      "api": "csp_MyDriveGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "玩偶",
+      "name": "👽玩偶哥哥┃4K弹幕",
+      "type": 3,
+      "api": "csp_WoGGGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "YGP",
+      "name": "🚀荐影┃预告片",
+      "type": 3,
+      "api": "csp_YGPGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "MTV1",
+      "name": "🎙️易听┃音乐",
+      "type": 3,
+      "api": "csp_MusicGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "seed",
+      "name": "💡聚剧┃四盘",
+      "type": 3,
+      "api": "csp_SeedhubGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "光影",
+      "name": "🌞光影┃不卡",
+      "type": 3,
+      "api": "csp_T4Guard",
+      "runtime": "android"
+    },
+    {
+      "key": "厂长",
+      "name": "📔厂长┃不卡",
+      "type": 3,
+      "api": "csp_NewCzGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "海绵",
+      "name": "🐬海绵┃不卡",
+      "type": 3,
+      "api": "csp_HmysGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "立播",
+      "name": "🌟立播┃不卡",
+      "type": 3,
+      "api": "csp_LibvioGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "瓜子",
+      "name": "👀瓜子┃不卡",
+      "type": 3,
+      "api": "csp_AppgzGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "比特",
+      "name": "🍄比特┃不卡",
+      "type": 3,
+      "api": "csp_BttwooGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "糯米",
+      "name": "🍓糯米┃秒播",
+      "type": 3,
+      "api": "csp_NmyswvGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "文采",
+      "name": "💮文采┃秒播",
+      "type": 3,
+      "api": "csp_JpysGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "奶酪",
+      "name": "🧀奶酪┃秒播",
+      "type": 3,
+      "api": "csp_T4Guard",
+      "runtime": "android"
+    },
+    {
+      "key": "热播",
+      "name": "📺热播┃多线",
+      "type": 3,
+      "api": "csp_AppTTGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "风云",
+      "name": "☁️风云┃多线",
+      "type": 3,
+      "api": "csp_FyGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "视界",
+      "name": "🌸茉莉┃多线",
+      "type": 3,
+      "api": "csp_App99Guard",
+      "runtime": "android"
+    },
+    {
+      "key": "剧圈",
+      "name": "🐻剧圈┃多线",
+      "type": 3,
+      "api": "csp_AppSxGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "荐片",
+      "name": "🥝荐片┃多线",
+      "type": 3,
+      "api": "csp_JPJGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "奥特",
+      "name": "🏝奥特┃多线",
+      "type": 3,
+      "api": "csp_AueteGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "新6V",
+      "name": "🧲新6V┃磁力",
+      "type": 3,
+      "api": "csp_SixVGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "AiDj",
+      "name": "❤️AI剧┃弹幕",
+      "type": 3,
+      "api": "csp_AiDjGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "Dm84",
+      "name": "🚌巴士┃动漫",
+      "type": 3,
+      "api": "csp_Dm84Guard",
+      "runtime": "android"
+    },
+    {
+      "key": "看球",
+      "name": "⚽八八┃看球",
+      "type": 3,
+      "api": "csp_KanqiuGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "多多",
+      "name": "🏀多多┃回放",
+      "type": 3,
+      "api": "csp_DoubaoGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "吃瓜",
+      "name": "🏐吃瓜┃看球",
+      "type": 3,
+      "api": "csp_LiveGzGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "alllive",
+      "name": "🎮一直播┃直播",
+      "type": 3,
+      "api": "csp_AllliveGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "MTV",
+      "name": "🎶明星┃MV",
+      "type": 3,
+      "api": "csp_BiliGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "有声小说",
+      "name": "🎧有声┃小说",
+      "type": 3,
+      "api": "csp_YueTingGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "Aid",
+      "name": "🚑急救┃教学",
+      "type": 3,
+      "api": "csp_FirstAidGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "虎牙js",
+      "name": "🐯虎牙┃直播",
+      "type": 3,
+      "api": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "runtime": "javascript"
+    },
+    {
+      "key": "斗鱼js",
+      "name": "🐟斗鱼┃直播",
+      "type": 3,
+      "api": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "runtime": "javascript"
+    },
+    {
+      "key": "ZPan",
+      "name": "🎈盘搜┃四盘",
+      "type": 3,
+      "api": "csp_S_zpsGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "JPan",
+      "name": "🦋易搜┃四盘",
+      "type": 3,
+      "api": "csp_S_zpsGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "YpanSo",
+      "name": "🐌盘她┃夸父",
+      "type": 3,
+      "api": "csp_YpanSoGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "BpanSo",
+      "name": "🐞盘他┃嘟嘟",
+      "type": 3,
+      "api": "csp_BpanSoGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "抠搜",
+      "name": "🌶️抠抠┃搜搜",
+      "type": 3,
+      "api": "csp_KkSsGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "UC",
+      "name": "🌈优汐┃搜搜",
+      "type": 3,
+      "api": "csp_UuSsGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "Bili",
+      "name": "🅱哔哔合集┃弹幕",
+      "type": 3,
+      "api": "csp_BiliGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "Biliych",
+      "name": "🅱哔哔演唱会┃弹幕",
+      "type": 3,
+      "api": "csp_BiliGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "dr_兔小贝",
+      "name": "📚儿童┃启蒙",
+      "type": 3,
+      "api": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "runtime": "javascript"
+    },
+    {
+      "key": "少儿教育",
+      "name": "📚少儿┃教育",
+      "type": 3,
+      "api": "csp_BiliGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "小学课堂",
+      "name": "📚小学┃课堂",
+      "type": 3,
+      "api": "csp_BiliGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "初中课堂",
+      "name": "📚初中┃课堂",
+      "type": 3,
+      "api": "csp_BiliGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "高中教育",
+      "name": "📚高中┃课堂",
+      "type": 3,
+      "api": "csp_BiliGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "push_agent",
+      "name": "🛴手机┃推送",
+      "type": 3,
+      "api": "csp_PushGuard",
+      "runtime": "android"
+    },
+    {
+      "key": "cc",
+      "name": "请勿信视频中任何广告",
+      "type": 3,
+      "api": "csp_XPathGuard",
+      "runtime": "android"
+    }
+  ],
+  "lives": [
+    {
+      "name": "综合",
+      "url": "http://193.123.86.190:14888/TV/iptv.php",
+      "android_loopback_proxy": false
+    },
+    {
+      "name": "牛播一",
+      "url": "http://127.0.0.1:9978/proxy?do=cctva",
+      "android_loopback_proxy": true
+    },
+    {
+      "name": "Kimentanm",
+      "url": "https://ghproxy.net/https://raw.githubusercontent.com/Kimentanm/aptv/master/m3u/iptv.m3u",
+      "android_loopback_proxy": false
+    },
+    {
+      "name": "虎牙一起看",
+      "url": "https://sub.ottiptv.cc/huyayqk.m3u",
+      "android_loopback_proxy": false
+    },
+    {
+      "name": "斗鱼一起看",
+      "url": "https://sub.ottiptv.cc/douyuyqk.m3u",
+      "android_loopback_proxy": false
+    },
+    {
+      "name": "YY轮播",
+      "url": "https://sub.ottiptv.cc/yylunbo.m3u",
+      "android_loopback_proxy": false
+    }
+  ],
+  "limits": [
+    "Configuration decoding does not execute spiders or verify media playback.",
+    "DEX/JAR and Android ELF libraries do not run directly on iOS.",
+    "drpy scripts require a compatible host engine, not just a JavaScript evaluator."
+  ],
+  "spider": {
+    "url": "https://xiuxiu-pro-new.meitudata.com/posters/937f5abf1c7c4ff2f170d835c5c46c21.jpg",
+    "status": 200,
+    "content_type": "application/zip",
+    "bytes": 1411181,
+    "md5": "9d5f341aa5f3353b50cc3bc16b4f3e8a",
+    "expected_md5": "9d5f341aa5f3353b50cc3bc16b4f3e8a",
+    "md5_matches": true,
+    "entries": [
+      "classes.dex",
+      "META-INF/MANIFEST.MF",
+      "assets/ftyguard_v7.so",
+      "assets/ftyguard_v8.so",
+      "assets/ftyshinidie.guard"
+    ],
+    "has_dex": true,
+    "android_runtime_references": [
+      "Landroid/app/Application;",
+      "Landroid/content/Context;",
+      "Landroid/content/ContextWrapper;",
+      "Landroid/content/SharedPreferences$Editor;",
+      "Landroid/content/SharedPreferences;",
+      "Landroid/content/pm/ApplicationInfo;",
+      "Landroid/os/Build$VERSION;",
+      "Landroid/os/Build;",
+      "Landroid/util/Log;",
+      "Ldalvik/system/DexClassLoader;"
+    ],
+    "native_libraries": [
+      {
+        "entry": "assets/ftyguard_v7.so",
+        "format": "ELF",
+        "bits": 32,
+        "architecture": "ARM"
+      },
+      {
+        "entry": "assets/ftyguard_v8.so",
+        "format": "ELF",
+        "bits": 64,
+        "architecture": "AArch64"
+      }
+    ]
+  }
+}
