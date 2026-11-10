@@ -1,0 +1,17 @@
+name: Source connectivity diagnostics
+"on":
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/probe_additional_sources.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-connectivity
+          path: dist/additional-source-probe.json
+          retention-days: 7

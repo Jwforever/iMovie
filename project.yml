@@ -30,6 +30,8 @@ targets:
         buildPhase: resources
       - path: Resources/media-observer.js
         buildPhase: resources
+      - path: Resources/ThirdPartyNotices.txt
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: local.imovie.player

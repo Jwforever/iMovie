@@ -149,7 +149,7 @@ import WebKit
             }
             .sheet(item: $nativeRequest) { request in PlayerSheet(media: request.media).environmentObject(store) }
         }
-        .onAppear { controller.load(); store.record(media, position: 0) }
+        .onAppear { controller.load(); store.record(media, position: store.position(for: media)) }
         .onDisappear { controller.stop() }
     }
 }

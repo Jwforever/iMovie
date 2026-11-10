@@ -41,10 +41,21 @@ import SwiftUI
             Section("iMovie 0.2.0") {
                 Text("收藏和播放记录保存在本机。配置和媒体由你提供，应用不附带影片库。")
                     .font(.subheadline).foregroundStyle(.secondary)
+                NavigationLink("开源组件许可") {
+                    ScrollView {
+                        Text(Self.notices).font(.caption.monospaced()).textSelection(.enabled).padding(20)
+                    }.navigationTitle("开源组件许可")
+                }
             }
         }
         .scrollContentBackground(.hidden).background(Theme.backdrop)
         .navigationTitle("设置")
+    }
+
+    private static var notices: String {
+        guard let url = Bundle.main.url(forResource: "ThirdPartyNotices", withExtension: "txt"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return "SwiftSoup · MIT License" }
+        return text
     }
 }
 
