@@ -13,6 +13,8 @@ jobs:
         run: xcodebuild -version
       - name: Install XcodeGen
         run: brew list xcodegen || brew install xcodegen
+      - name: Probe additional source connectivity
+        run: python3 scripts/probe_additional_sources.py
       - name: Test and build
         run: bash scripts/build-unsigned.sh
       - name: Unit test report
@@ -25,6 +27,7 @@ jobs:
           path: |
             dist/*.ipa
             dist/*.sha256
+            dist/additional-source-probe.json
           if-no-files-found: error
           retention-days: 7
       - name: Simulator playback smoke tests

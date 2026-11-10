@@ -33,9 +33,9 @@ public struct HTMLSourceAdapter {
             if adapter == .libvio { components.queryItems! += [URLQueryItem(name: "mid", value: "1"), URLQueryItem(name: "limit", value: "50")] }
         } else if let category, !category.isEmpty {
             guard category.allSatisfy(\.isNumber), category.count < 6 else { throw ViewerError.message("分类编号无效。") }
-            components.path = adapter == .dm84 ? "/show-\(category)--time----\(requested).html" : "/show/\(category)--time-----\(requested)---.html"
+            components.path = adapter == .dm84 ? "/show-\(category)--time----\(requested).html" : "/show/\(category)--time------\(requested)---.html"
         } else if requested > 1 {
-            components.path = adapter == .dm84 ? "/show-1--time----\(requested).html" : "/show/1--time-----\(requested)---.html"
+            components.path = adapter == .dm84 ? "/show-1--time----\(requested).html" : "/show/1--time------\(requested)---.html"
         }
         let (data, finalURL) = try await http.data(from: components.url!, headers: headers)
         if adapter == .libvio && !query.isEmpty {
@@ -109,7 +109,8 @@ public struct HTMLSourceAdapter {
         let doc = try document(data, baseURL: baseURL)
         let title = try doc.select(adapter == .dm84 ? "h1.v_title" : "h1").first()?.text() ?? ""
         guard !title.isEmpty else { throw ViewerError.message("详情页面没有返回标题，可能需要在浏览器中验证。") }
-        let poster = try doc.select("meta[property=og:image]").attr("content")
+        let metadataPoster = try doc.select("meta[property=og:image]").attr("content")
+        let poster = metadataPoster.isEmpty ? try doc.select(".stui-content__thumb img[data-original]").attr("data-original") : metadataPoster
         let summary = try doc.select(adapter == .dm84 ? "meta[property=og:description]" : ".detail-content").first()
         let summaryText = adapter == .dm84 ? (try summary?.attr("content") ?? "") : (try summary?.text() ?? "")
         let tabs = try doc.select(adapter == .dm84 ? "ul.tab_control li" : "div.stui-pannel__head h3")
