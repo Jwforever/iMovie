@@ -106,7 +106,11 @@ public struct MediaLink: Codable, Identifiable, Hashable {
     public var headers: [String: String]
     public var group: String
     public var kind: PlaybackKind? = nil
-    public var id: String { url + "|" + title }
+    public var reference: PlaybackReference? = nil
+    public var id: String {
+        if let reference { return reference.site.key + "|" + reference.episode.value + "|" + title }
+        return url + "|" + title
+    }
 
     public init(title: String, url: String, headers: [String: String] = [:], group: String = "", kind: PlaybackKind? = nil) {
         self.title = title
@@ -119,6 +123,13 @@ public struct MediaLink: Codable, Identifiable, Hashable {
 
 public enum PlaybackKind: String, Codable {
     case direct, web
+}
+
+/// 保存来源和选集，重新打开收藏时刷新有时效的播放地址。
+public struct PlaybackReference: Codable, Hashable {
+    public var site: SourceSite
+    public var episode: Episode
+    public var flag: String
 }
 
 public struct VideoCategory: Codable, Identifiable, Hashable {
@@ -143,7 +154,7 @@ public struct VideoPage {
     public var pageCount: Int
 }
 
-public struct Episode: Identifiable, Hashable {
+public struct Episode: Codable, Identifiable, Hashable {
     public var title: String
     public var value: String
     public var id: String { title + "|" + value }

@@ -43,6 +43,7 @@ test('media observer detects DOM, fetch and iframe media and ignores unsafe sche
     await frame.evaluate(origin => {
       const video = document.createElement('video');
       video.src = origin + '/embedded.mp4';
+      video.pause = () => { window.imoviePauseObserved = true; };
       document.body.append(video);
     }, origin);
     await page.waitForTimeout(500);
@@ -52,6 +53,8 @@ test('media observer detects DOM, fetch and iframe media and ignores unsafe sche
     assert.equal(events.filter(event => event.url === origin + '/playlist.m3u8').length, 1);
     assert.equal(events.filter(event => event.url.startsWith('file:')).length, 0);
     assert.ok(events.every(event => typeof event.userAgent === 'string'));
+    await page.evaluate(() => window.postMessage({ type: 'iMovie:pause' }, '*'));
+    await frame.waitForFunction(() => window.imoviePauseObserved === true);
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

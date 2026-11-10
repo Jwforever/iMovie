@@ -3,6 +3,13 @@
   if (window.__iMovieObserverInstalled) return;
   window.__iMovieObserverInstalled = true;
   const seen = new Set();
+  window.addEventListener('message', event => {
+    if (event.data?.type !== 'iMovie:pause' || (event.source !== window && event.source !== window.parent)) return;
+    document.querySelectorAll('video,audio').forEach(media => media.pause());
+    document.querySelectorAll('iframe').forEach(frame => {
+      try { frame.contentWindow.postMessage({ type: 'iMovie:pause' }, '*'); } catch { }
+    });
+  });
   const send = value => {
     if (typeof value !== 'string' || !value || value.length > 16000) return;
     let url;

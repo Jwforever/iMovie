@@ -34,6 +34,9 @@ final class PlaybackUITests: XCTestCase {
         app.tabBars.buttons["我的"].tap()
         XCTAssertTrue(app.staticTexts["播放验证样片 · 第 1 集"].firstMatch.waitForExistence(timeout: 5))
         capture("04-bookmark")
+        app.staticTexts["播放验证样片 · 第 1 集"].firstMatch.tap()
+        assertPlaying()
+        app.buttons["完成"].tap()
         app.segmentedControls.buttons["播放记录"].tap()
         XCTAssertTrue(app.staticTexts["播放验证样片 · 第 1 集"].firstMatch.exists)
     }

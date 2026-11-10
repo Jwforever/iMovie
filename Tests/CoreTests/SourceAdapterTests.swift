@@ -54,7 +54,21 @@ final class SourceAdapterTests: XCTestCase {
         let old = Data(#"{"title":"旧记录","url":"https://example.test/a.mp4","headers":{},"group":"测试"}"#.utf8)
         let media = try JSONDecoder().decode(MediaLink.self, from: old)
         XCTAssertNil(media.kind)
+        XCTAssertNil(media.reference)
         let web = MediaLink(title: "网页", url: "https://example.test/play", kind: .web)
         XCTAssertEqual(try JSONDecoder().decode(MediaLink.self, from: JSONEncoder().encode(web)).kind, .web)
+    }
+
+    func testSavedEpisodeKeepsSourceForRefreshingExpiringAddresses() throws {
+        let config = try ConfigDecoder.decode(Data(#"{"sites":[{"key":"bili","name":"公开内容","type":3,"api":"csp_BiliGuard"}]}"#.utf8), sourceURL: URL(string: "https://example.test/tv")!)
+        var media = MediaLink(title: "分集", url: "https://media.example.test/expired.mp4?expires=1")
+        media.reference = PlaybackReference(site: config.sites[0], episode: Episode(title: "第一集", value: "bili:BV1vmWJ6LEmW:43436606874"), flag: "公开视频")
+        let restored = try JSONDecoder().decode(MediaLink.self, from: JSONEncoder().encode(media))
+        XCTAssertEqual(restored.reference?.site.nativeAdapter, .bilibili)
+        XCTAssertEqual(restored.reference?.episode.value, "bili:BV1vmWJ6LEmW:43436606874")
+        XCTAssertEqual(restored.reference?.flag, "公开视频")
+        var refreshed = restored
+        refreshed.url = "https://media.example.test/new.mp4?expires=2"
+        XCTAssertEqual(refreshed.id, restored.id)
     }
 }

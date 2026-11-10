@@ -37,6 +37,21 @@ final class DecoderTests: XCTestCase {
         XCTAssertEqual(result.sites.first?.name, "a \" // /* b")
     }
 
+    func testCRLFCommentsKeepFollowingSourcesInWrappedConfiguration() throws {
+        // Swift treats CRLF as one Character. It must still end a line comment.
+        let text = "{\r\n\"sites\":[\r\n// omitted Android source\r\n" +
+            #"{"key":"dm","name":"🚌巴士┃动漫","type":3,"api":"csp_Dm84Guard"},"# +
+            "\r\n/* block\r\ncomment */\r\n" +
+            #"{"key":"bili","name":"B站","type":3,"api":"csp_BiliGuard"},"# +
+            "\r\n],\r\n}\r\n"
+        var wrapped = Data([0xFF, 0xD8, 0x00])
+        wrapped.append(Data(("image**" + Data(text.utf8).base64EncodedString()).utf8))
+        let result = try ConfigDecoder.decode(wrapped, sourceURL: sourceURL)
+        XCTAssertEqual(result.nativeSites.count, 2)
+        XCTAssertEqual(result.sites.map(\.key), ["dm", "bili"])
+        XCTAssertEqual(result.sites[0].name, "🚌巴士┃动漫")
+    }
+
     func testPlainBase64WithoutPadding() throws {
         let text = #"{"sites":[{"key":"a","type":1,"api":"https://example.test/api"}]}"#
         let base64 = Data(text.utf8).base64EncodedString().replacingOccurrences(of: "=", with: "")

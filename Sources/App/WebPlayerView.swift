@@ -66,7 +66,9 @@ import WebKit
                 headers["Referer"] = page.absoluteString
             }
         }
-        candidates.append(MediaLink(title: source.title, url: url.absoluteString, headers: headers, group: source.group))
+        var media = MediaLink(title: source.title, url: url.absoluteString, headers: headers, group: source.group)
+        media.reference = source.reference
+        candidates.append(media)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { loading = false }
@@ -89,7 +91,7 @@ import WebKit
         nil
     }
 
-    func pause() { webView.evaluateJavaScript("document.querySelectorAll('video,audio').forEach(v=>v.pause())", completionHandler: nil) }
+    func pause() { webView.evaluateJavaScript("window.postMessage({type:'iMovie:pause'}, '*')", completionHandler: nil) }
     func stop() { pause(); webView.stopLoading(); webView.loadHTMLString("", baseURL: nil) }
 }
 

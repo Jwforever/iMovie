@@ -126,12 +126,12 @@ public enum ConfigDecoder {
                 index += 1
             } else if current == "/", next == "/" {
                 index += 2
-                while index < characters.count && characters[index] != "\n" && characters[index] != "\r" { index += 1 }
+                while index < characters.count && !characters[index].isNewline { index += 1 }
                 result.append(" ")
             } else if current == "/", next == "*" {
                 index += 2
                 while index + 1 < characters.count && !(characters[index] == "*" && characters[index + 1] == "/") {
-                    if characters[index] == "\n" || characters[index] == "\r" { result.append(characters[index]) }
+                    if characters[index].isNewline { result.append(characters[index]) }
                     index += 1
                 }
                 index = min(characters.count, index + 2)

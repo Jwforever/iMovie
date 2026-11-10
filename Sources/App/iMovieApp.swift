@@ -41,6 +41,12 @@ enum Theme {
             if request.media.kind == .web { WebPlayerSheet(media: request.media).environmentObject(store) }
             else { PlayerSheet(media: request.media).environmentObject(store) }
         }
+        .overlay {
+            if store.resolvingPlayback {
+                ProgressView("正在更新播放地址…")
+                    .padding(22).background(Theme.panel, in: RoundedRectangle(cornerRadius: 18))
+            }
+        }
         .alert("暂时无法完成", isPresented: Binding(
             get: { store.error != nil }, set: { if !$0 { store.error = nil } }
         )) {

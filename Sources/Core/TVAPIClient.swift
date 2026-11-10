@@ -29,6 +29,12 @@ public struct TVAPIClient {
     }
 
     public func resolve(site: SourceSite, episode: Episode, flag: String, title: String) async throws -> MediaLink {
+        var media = try await resolveLink(site: site, episode: episode, flag: flag, title: title)
+        media.reference = PlaybackReference(site: site, episode: episode, flag: flag)
+        return media
+    }
+
+    private func resolveLink(site: SourceSite, episode: Episode, flag: String, title: String) async throws -> MediaLink {
         if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).resolve(episode: episode, title: title) }
         if site.nativeAdapter == .dm84 || site.nativeAdapter == .libvio { return try await HTMLSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
         if site.nativeAdapter == .tuxiaobei {

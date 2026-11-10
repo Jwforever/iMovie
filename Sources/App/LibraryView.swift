@@ -266,7 +266,7 @@ import SwiftUI
         do {
             let link = try await client.resolve(site: site, episode: episode, flag: line.name, title: "\(video.title) · \(episode.title)")
             guard !Task.isCancelled else { return }
-            store.play(link)
+            store.play(link, refresh: false)
         } catch is CancellationError { }
         catch { store.error = error.localizedDescription }
     }

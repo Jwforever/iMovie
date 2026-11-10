@@ -23,6 +23,7 @@ final class AppStore: ObservableObject {
     @Published private(set) var history: [WatchRecord] = []
     @Published var configURL: String
     @Published var importing = false
+    @Published private(set) var resolvingPlayback = false
     @Published var error: String?
     @Published var playback: PlaybackRequest?
 
@@ -57,7 +58,20 @@ final class AppStore: ObservableObject {
         catch { self.error = error.localizedDescription }
     }
 
-    func play(_ media: MediaLink) {
+    func play(_ media: MediaLink, refresh: Bool = true) {
+        if refresh, let reference = media.reference {
+            guard !resolvingPlayback else { return }
+            resolvingPlayback = true
+            Task {
+                defer { resolvingPlayback = false }
+                do {
+                    let updated = try await TVAPIClient().resolve(site: reference.site, episode: reference.episode, flag: reference.flag, title: media.title)
+                    play(updated, refresh: false)
+                } catch is CancellationError { }
+                catch { self.error = error.localizedDescription }
+            }
+            return
+        }
         do {
             _ = try HTTPAddress.parse(media.url)
             playback = PlaybackRequest(media: media)
