@@ -49,8 +49,22 @@ import WebKit
         var headers = ["User-Agent": HTMLSourceAdapter.userAgent]
         let policy = (payload["referrerPolicy"] as? String ?? "").lowercased()
         if policy != "no-referrer" {
-            let origin = page.scheme! + "://" + (page.host ?? "") + (page.port.map { ":\($0)" } ?? "") + "/"
-            headers["Referer"] = url.host == page.host ? page.absoluteString : origin
+            var origin = URLComponents()
+            origin.scheme = page.scheme
+            origin.host = page.host
+            origin.port = page.port
+            origin.path = "/"
+            let sameOrigin = url.scheme == page.scheme && url.host == page.host && url.port == page.port
+            let downgrade = page.scheme == "https" && url.scheme == "http"
+            if policy == "same-origin" && !sameOrigin {
+                headers["Referer"] = nil
+            } else if downgrade && !["unsafe-url", "origin"].contains(policy) {
+                headers["Referer"] = nil
+            } else if policy == "origin" || policy == "strict-origin" || !sameOrigin {
+                headers["Referer"] = origin.url?.absoluteString
+            } else {
+                headers["Referer"] = page.absoluteString
+            }
         }
         candidates.append(MediaLink(title: source.title, url: url.absoluteString, headers: headers, group: source.group))
     }
