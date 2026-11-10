@@ -99,7 +99,8 @@ public struct HTMLSourceAdapter {
         }
         let hasMore = try doc.select("a").array().contains { node in
             let label = try node.text()
-            return label.contains("下一页") && (try node.attr("href")) != "javascript:;"
+            let href = try node.attr("href")
+            return label.contains("下一页") && href != "javascript:;"
         }
         return VideoPage(categories: categories, videos: videos, page: page, pageCount: hasMore ? page + 1 : page)
     }
