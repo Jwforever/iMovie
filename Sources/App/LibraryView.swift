@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor struct LibraryView: View {
     @EnvironmentObject private var store: AppStore
     @State private var directURL = ""
+    @State private var openAsWebPage = false
 
     var body: some View {
         ScrollView {
@@ -18,11 +19,15 @@ import SwiftUI
                     Label("打开播放地址", systemImage: "link").font(.headline)
                     TextField("https://… / 视频或 HLS 地址", text: $directURL)
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityIdentifier("library-direct-url")
                         .padding(13).background(Theme.backdrop, in: RoundedRectangle(cornerRadius: 12))
                         .onSubmit { playDirect() }
+                    Toggle("使用内置网页播放器", isOn: $openAsWebPage)
+                        .font(.subheadline).accessibilityIdentifier("library-web-mode")
                     Button(action: playDirect) {
                         Label("开始播放", systemImage: "play.fill").frame(maxWidth: .infinity).padding(.vertical, 7)
-                    }.buttonStyle(.borderedProminent).disabled(directURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }.buttonStyle(.borderedProminent).accessibilityIdentifier("library-open")
+                        .disabled(directURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }.padding(18).background(Theme.panel, in: RoundedRectangle(cornerRadius: 22))
 
                 if let config = store.config {
@@ -45,7 +50,7 @@ import SwiftUI
                                     RuntimeLabel(runtime: site.runtime)
                                     Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                                 }.padding(15).background(Theme.panel, in: RoundedRectangle(cornerRadius: 16))
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.plain).accessibilityIdentifier("source-\(site.key)")
                         }
                     }
                 } else {
@@ -63,7 +68,7 @@ import SwiftUI
     private func playDirect() {
         do {
             let url = try HTTPAddress.parse(directURL)
-            store.play(MediaLink(title: url.lastPathComponent.isEmpty ? "直链播放" : url.lastPathComponent, url: url.absoluteString, group: "直链"))
+            store.play(MediaLink(title: url.lastPathComponent.isEmpty ? "地址播放" : url.lastPathComponent, url: url.absoluteString, group: openAsWebPage ? "网页" : "直链", kind: openAsWebPage ? .web : .direct))
         } catch { store.error = error.localizedDescription }
     }
 }

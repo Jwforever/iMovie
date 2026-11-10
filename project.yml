@@ -38,6 +38,17 @@ targets:
         SUPPORTS_MACCATALYST: "NO"
         GENERATE_INFOPLIST_FILE: "NO"
         INFOPLIST_FILE: Resources/Info.plist
+  iMovieUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/UITests
+    dependencies:
+      - target: iMovie
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.imovie.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
 schemes:
   iMovie:
     build:
@@ -45,5 +56,9 @@ schemes:
         iMovie: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - iMovieUITests
     archive:
       config: Release

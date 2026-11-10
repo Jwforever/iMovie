@@ -1,0 +1,10 @@
+{
+  "name": "imovie-web-observer-tests",
+  "private": true,
+  "scripts": {
+    "test:browser": "node --test Tests/Browser/media-observer.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
+  }
+}

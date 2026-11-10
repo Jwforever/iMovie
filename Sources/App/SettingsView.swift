@@ -8,13 +8,14 @@ import SwiftUI
             Section {
                 TextField("接口配置地址", text: $store.configURL, axis: .vertical)
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .accessibilityIdentifier("config-url")
                 Button { Task { await store.importConfig() } } label: {
                     HStack {
                         Label(store.importing ? "正在导入…" : "导入 / 更新配置", systemImage: "arrow.down.circle")
                         Spacer()
                         if store.importing { ProgressView() }
                     }
-                }.disabled(store.importing)
+                }.disabled(store.importing).accessibilityIdentifier("config-import")
             } header: { Text("TVBox 接口") } footer: {
                 Text("已填入你提供的饭太硬地址。点击导入后才会连接；支持图片封装、Base64 和带注释的 JSON 配置。")
             }

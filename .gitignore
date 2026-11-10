@@ -7,3 +7,4 @@ dist/
 xcuserdata/
 __pycache__/
 .swiftpm/
+node_modules/

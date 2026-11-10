@@ -5,7 +5,9 @@ import AVKit
 final class PlaybackController: ObservableObject {
     let player = AVPlayer()
     @Published var error: String?
+    @Published private(set) var isPlaying = false
     private var observation: NSKeyValueObservation?
+    private var timeControlObservation: NSKeyValueObservation?
     private var failureObserver: NSObjectProtocol?
     private var resume = 0.0
 
@@ -43,6 +45,12 @@ final class PlaybackController: ObservableObject {
             }
             player.replaceCurrentItem(with: item)
             player.allowsExternalPlayback = true
+            timeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] _, _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.isPlaying = self.player.timeControlStatus == .playing
+                }
+            }
         } catch { self.error = error.localizedDescription }
     }
 
@@ -54,6 +62,8 @@ final class PlaybackController: ObservableObject {
 
     func stop() {
         observation = nil
+        timeControlObservation = nil
+        isPlaying = false
         if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
         failureObserver = nil
         player.pause()
@@ -97,6 +107,8 @@ final class PlaybackController: ObservableObject {
                     NativeVideoPlayer(player: controller.player)
                         .aspectRatio(16.0 / 9.0, contentMode: .fit).background(.black)
                         .clipShape(RoundedRectangle(cornerRadius: 15))
+                        .accessibilityIdentifier("native-player")
+                        .accessibilityValue(controller.isPlaying ? "playing" : "waiting")
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(media.title).font(.title3.bold())

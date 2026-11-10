@@ -15,7 +15,6 @@
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key><true/>
-        <key>NSAllowsArbitraryLoadsForMedia</key><true/>
     </dict>
     <key>NSLocalNetworkUsageDescription</key><string>连接你添加的局域网媒体来源和播放设备。</string>
     <key>UIBackgroundModes</key><array><string>audio</string></array>

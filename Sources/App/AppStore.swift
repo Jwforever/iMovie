@@ -27,11 +27,21 @@ final class AppStore: ObservableObject {
     @Published var playback: PlaybackRequest?
 
     init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        configURL = defaults.string(forKey: "configURL") ?? Self.defaultConfigURL
-        config = Self.load(SourceConfig.self, key: "config", defaults: defaults)
-        favorites = Self.load([MediaLink].self, key: "favorites", defaults: defaults) ?? []
-        history = Self.load([WatchRecord].self, key: "history", defaults: defaults) ?? []
+        let storage: UserDefaults
+        let initialConfigURL: String
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        storage = environment["IMOVIE_DEFAULTS_SUITE"].flatMap { UserDefaults(suiteName: $0) } ?? defaults
+        initialConfigURL = environment["IMOVIE_CONFIG_URL"] ?? storage.string(forKey: "configURL") ?? Self.defaultConfigURL
+        #else
+        storage = defaults
+        initialConfigURL = storage.string(forKey: "configURL") ?? Self.defaultConfigURL
+        #endif
+        self.defaults = storage
+        configURL = initialConfigURL
+        config = Self.load(SourceConfig.self, key: "config", defaults: storage)
+        favorites = Self.load([MediaLink].self, key: "favorites", defaults: storage) ?? []
+        history = Self.load([WatchRecord].self, key: "history", defaults: storage) ?? []
     }
 
     func importConfig() async {
