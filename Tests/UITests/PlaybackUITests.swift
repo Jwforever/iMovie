@@ -50,6 +50,41 @@ final class PlaybackUITests: XCTestCase {
         capture("06-web-to-native-playing")
     }
 
+    func testUserConfigAndDM84WebMedia() throws {
+        app.terminate()
+        app.launchEnvironment["IMOVIE_CONFIG_URL"] = "http://www.饭太硬.cc/tv"
+        app.launch()
+        app.tabBars.buttons["设置"].tap()
+        app.buttons["config-import"].tap()
+        XCTAssertTrue(app.staticTexts["兼容情况"].waitForExistence(timeout: 35))
+        capture("07-user-config-imported")
+        app.tabBars.buttons["片库"].tap()
+        let source = app.buttons["source-Dm84"]
+        for _ in 0..<5 {
+            if source.exists && source.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(source.exists)
+        source.tap()
+        let query = app.textFields["site-search-query"]
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        query.tap()
+        query.typeText("神厨狂后\n")
+        let video = app.staticTexts["神厨狂后"].firstMatch
+        XCTAssertTrue(video.waitForExistence(timeout: 35))
+        capture("08-dm84-search")
+        video.tap()
+        let episode = app.buttons["12"].firstMatch
+        XCTAssertTrue(episode.waitForExistence(timeout: 35))
+        capture("09-dm84-episodes")
+        episode.tap()
+        XCTAssertTrue(app.buttons["系统播放"].waitForExistence(timeout: 45))
+        capture("10-dm84-web-media-detected")
+        app.buttons["系统播放"].tap()
+        assertPlaying()
+        capture("11-dm84-system-playing")
+    }
+
     private func assertPlaying() {
         let player = app.descendants(matching: .any).matching(identifier: "native-player").firstMatch
         XCTAssertTrue(player.waitForExistence(timeout: 10))

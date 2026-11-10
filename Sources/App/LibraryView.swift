@@ -106,8 +106,10 @@ import SwiftUI
                         HStack {
                             TextField("搜索这个来源", text: $search).submitLabel(.search)
                                 .onSubmit { submitSearch() }
+                                .accessibilityIdentifier("site-search-query")
                             Button(action: submitSearch) { Image(systemName: "magnifyingglass") }
                                 .accessibilityLabel("搜索")
+                                .accessibilityIdentifier("site-search-submit")
                         }.padding(13).background(Theme.panel, in: RoundedRectangle(cornerRadius: 14))
                         if !categories.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
