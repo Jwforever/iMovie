@@ -25,6 +25,8 @@ final class SourceAdapterTests: XCTestCase {
         XCTAssertEqual(page.videos[0].title, "动漫 & 电影")
         XCTAssertEqual(page.videos[0].poster, "https://dm84.tv/poster.jpg")
         XCTAssertEqual(page.pageCount, 2)
+        let searchPage = try HTMLSourceAdapter.decodePage(Data(html.utf8), adapter: .dm84, baseURL: URL(string: "https://dm84.tv/s----------.html?wd=test")!, page: 1, allowPagination: false)
+        XCTAssertEqual(searchPage.pageCount, 1)
     }
 
     func testDM84DetailKeepsLinesAndRejectsExternalEpisodeLinks() throws {

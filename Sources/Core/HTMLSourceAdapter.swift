@@ -45,7 +45,7 @@ public struct HTMLSourceAdapter {
             }
             return TVAPIClient.decodePage(["list": list], baseURL: finalURL)
         }
-        return try Self.decodePage(data, adapter: adapter, baseURL: finalURL, page: requested)
+        return try Self.decodePage(data, adapter: adapter, baseURL: finalURL, page: requested, allowPagination: query.isEmpty)
     }
 
     public func detail(id: String) async throws -> Video {
@@ -69,7 +69,7 @@ public struct HTMLSourceAdapter {
         return MediaLink(title: title, url: finalURL.absoluteString, headers: headers, group: group, kind: .web)
     }
 
-    static func decodePage(_ data: Data, adapter: NativeSourceAdapter, baseURL: URL, page: Int) throws -> VideoPage {
+    static func decodePage(_ data: Data, adapter: NativeSourceAdapter, baseURL: URL, page: Int, allowPagination: Bool = true) throws -> VideoPage {
         let doc = try document(data, baseURL: baseURL)
         let nodes = try doc.select(adapter == .dm84 ? "div.item" : "ul.stui-vodlist > li")
         let nav = try doc.select(adapter == .dm84 ? "ul.nav_row a[href^=/list-]" : "ul.stui-header__menu a[href*=/type/]")
@@ -102,7 +102,7 @@ public struct HTMLSourceAdapter {
             let href = try node.attr("href")
             return label.contains("下一页") && href != "javascript:;"
         }
-        return VideoPage(categories: categories, videos: videos, page: page, pageCount: hasMore ? page + 1 : page)
+        return VideoPage(categories: categories, videos: videos, page: page, pageCount: allowPagination && hasMore ? page + 1 : page)
     }
 
     static func decodeDetail(_ data: Data, adapter: NativeSourceAdapter, baseURL: URL, id: String) throws -> Video {
