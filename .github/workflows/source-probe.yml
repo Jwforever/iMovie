@@ -13,5 +13,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: source-connectivity
-          path: dist/additional-source-probe.json
+          path: |
+            dist/additional-source-probe.json
+            dist/source-pages/
           retention-days: 7
