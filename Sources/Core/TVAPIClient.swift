@@ -5,6 +5,25 @@ public struct TVAPIClient {
     public init() {}
 
     public func page(site: SourceSite, category: String? = nil, search: String? = nil, page: Int = 1) async throws -> VideoPage {
+        if category?.isEmpty != false, search?.isEmpty != false, page == 1 {
+            return try await home(site: site)
+        }
+        return try await loadPage(site: site, category: category, search: search, page: page)
+    }
+
+    /// TVBox home separates the categories document from optional home videos.
+    public func home(site: SourceSite) async throws -> VideoPage {
+        if site.nativeAdapter != nil { return try await loadPage(site: site, category: nil, search: nil, page: 1) }
+        let root = try await object(site: site, query: site.type == 4 ? ["filter": "true"] : [:])
+        let home = Self.decodePage(root, baseURL: try HTTPAddress.parse(site.api))
+        if !home.videos.isEmpty { return home }
+        let content = try await loadPage(site: site, category: home.categories.first?.id, search: nil, page: 1)
+        return VideoPage(categories: home.categories.isEmpty ? content.categories : home.categories,
+                         videos: content.videos, page: content.page, pageCount: content.pageCount)
+    }
+
+    private func loadPage(site: SourceSite, category: String?, search: String?, page: Int) async throws -> VideoPage {
+        if site.nativeAdapter == .auete { return try await AueteAdapter().page(category: category, search: search, page: page) }
         if site.nativeAdapter == .tuxiaobei {
             return try await TuxiaobeiAdapter().page(category: category, search: search, page: page)
         }
@@ -19,6 +38,7 @@ public struct TVAPIClient {
     }
 
     public func detail(site: SourceSite, id: String) async throws -> Video {
+        if site.nativeAdapter == .auete { return try await AueteAdapter().detail(id: id) }
         if site.nativeAdapter == .tuxiaobei { return try await TuxiaobeiAdapter().detail(id: id) }
         if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).detail(id: id) }
         if site.nativeAdapter == .dm84 || site.nativeAdapter == .libvio { return try await HTMLSourceAdapter(site: site).detail(id: id) }
@@ -35,6 +55,7 @@ public struct TVAPIClient {
     }
 
     private func resolveLink(site: SourceSite, episode: Episode, flag: String, title: String) async throws -> MediaLink {
+        if site.nativeAdapter == .auete { return try await AueteAdapter().resolve(episode: episode, title: title, group: site.name) }
         if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).resolve(episode: episode, title: title) }
         if site.nativeAdapter == .dm84 || site.nativeAdapter == .libvio { return try await HTMLSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
         if site.nativeAdapter == .tuxiaobei {

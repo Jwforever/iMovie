@@ -38,7 +38,7 @@ import SwiftUI
                 Text("支持 AVPlayer 可解码的格式，通常包括 HLS、MP4。部分 TS、MKV、网页链接及特殊音视频编码需要额外适配。")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("iMovie 0.2.0") {
+            Section("iMovie 0.3.0") {
                 Text("收藏和播放记录保存在本机。配置和媒体由你提供，应用不附带影片库。")
                     .font(.subheadline).foregroundStyle(.secondary)
                 NavigationLink("开源组件许可") {

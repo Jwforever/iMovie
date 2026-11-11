@@ -7,8 +7,9 @@ public struct BilibiliAdapter {
     public init(site: SourceSite) { self.site = site }
 
     public func page(category: String?, search: String?, page: Int) async throws -> VideoPage {
-        let categories = await sourceCategories()
         let query = (search?.isEmpty == false ? search : category) ?? ""
+        // Keyword search does not need a separate remote categories document.
+        let categories = search?.isEmpty == false ? [] : await sourceCategories()
         let root: [String: Any]
         if query.isEmpty {
             root = try await object(path: "/x/web-interface/popular", query: ["pn": String(page), "ps": "20"])

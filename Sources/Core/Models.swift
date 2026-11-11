@@ -57,7 +57,7 @@ public struct SourceSite: Codable, Identifiable, Hashable {
 }
 
 public enum NativeSourceAdapter: String, Codable {
-    case tuxiaobei, dm84, bilibili, libvio
+    case tuxiaobei, dm84, bilibili, libvio, auete
 
     static func identify(type: Int, api: String, extensionValue: String?) -> NativeSourceAdapter? {
         if type == 3 {
@@ -65,6 +65,7 @@ public enum NativeSourceAdapter: String, Codable {
             case "csp_Dm84Guard", "csp_Dm84": return .dm84
             case "csp_BiliGuard", "csp_Bili": return .bilibili
             case "csp_LibvioGuard", "csp_Libvio": return .libvio
+            case "csp_AueteGuard", "csp_Auete": return .auete
             default: break
             }
         }
@@ -98,6 +99,27 @@ public struct SourceConfig: Codable {
     public var importedAt: Date
     public var sourceURL: String
     public var nativeSites: [SourceSite] { sites.filter(\.isNative) }
+
+    /// A site's keyword search is shared by its category-specific Bili entries.
+    public var searchTargets: [SourceSearchTarget] {
+        var groups: [SourceSearchTarget] = []
+        var indexes: [String: Int] = [:]
+        for site in nativeSites where site.searchable {
+            let key = site.nativeAdapter.map { "native:" + $0.rawValue } ?? "api:\(site.type):\(site.api)"
+            if let index = indexes[key] { groups[index].aliases.append(site) }
+            else {
+                indexes[key] = groups.count
+                groups.append(SourceSearchTarget(site: site, aliases: []))
+            }
+        }
+        return groups
+    }
+}
+
+public struct SourceSearchTarget: Identifiable, Hashable {
+    public var site: SourceSite
+    public var aliases: [SourceSite]
+    public var id: String { site.id }
 }
 
 public struct MediaLink: Codable, Identifiable, Hashable {
