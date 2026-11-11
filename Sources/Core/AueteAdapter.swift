@@ -44,7 +44,21 @@ public struct AueteAdapter {
     public func resolve(episode: Episode, title: String, group: String) async throws -> MediaLink {
         let url = try HTTPAddress.parse(episode.value)
         guard Self.allowedHost(url), Self.contentPath(url.path, episode: true) else { throw ViewerError.message("选集地址与来源不匹配。") }
-        return MediaLink(title: title, url: url.absoluteString, headers: Self.headers, group: group, kind: .web)
+        let (data, final) = try await http.data(from: url, headers: Self.headers)
+        if let mediaURL = Self.decodePlayer(data) {
+            return MediaLink(title: title, url: mediaURL.absoluteString, headers: Self.headers, group: group)
+        }
+        return MediaLink(title: title, url: final.absoluteString, headers: Self.headers, group: group, kind: .web)
+    }
+
+    static func decodePlayer(_ data: Data) -> URL? {
+        guard let html = String(data: data, encoding: .utf8),
+              let regex = try? NSRegularExpression(pattern: #"\bvar\s+now\s*=\s*base64decode\(["']([A-Za-z0-9+/=]+)["']\)"#),
+              let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+              let range = Range(match.range(at: 1), in: html),
+              let bytes = Data(base64Encoded: String(html[range])), let value = String(data: bytes, encoding: .utf8),
+              HTTPAddress.isMedia(value) else { return nil }
+        return HTTPAddress.optional(value)
     }
 
     static func decodePage(_ data: Data, baseURL: URL, page: Int) throws -> VideoPage {

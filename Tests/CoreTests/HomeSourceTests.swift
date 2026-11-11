@@ -58,4 +58,14 @@ final class HomeSourceTests: XCTestCase {
         XCTAssertEqual(detail.lines[0].episodes.count, 1)
         XCTAssertEqual(detail.lines[1].episodes[0].value, "https://www.aeete.com/Tv/neidi/sample/play-1-0.html")
     }
+
+    func testAuetePlayerOnlyAcceptsPublicHTTPMediaFromNowVariable() throws {
+        let url = "https://media.example.test/play/index.m3u8?token=a&b=c"
+        let encoded = Data(url.utf8).base64EncodedString()
+        let html = "<script>var next=base64decode('aW52YWxpZA==');var now=base64decode(\"\(encoded)\");</script>"
+        XCTAssertEqual(AueteAdapter.decodePlayer(Data(html.utf8))?.absoluteString, url)
+        let unsafe = Data("file:///private/test.mp4".utf8).base64EncodedString()
+        XCTAssertNil(AueteAdapter.decodePlayer(Data("var now=base64decode('\(unsafe)')".utf8)))
+        XCTAssertNil(AueteAdapter.decodePlayer(Data("<html>验证</html>".utf8)))
+    }
 }

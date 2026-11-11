@@ -133,7 +133,7 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         let video = app.staticTexts["折月亮"].firstMatch
         for _ in 0..<4 {
-            if video.exists && video.isHittable { break }
+            if video.exists && video.isHittable && video.frame.maxY < app.frame.height - 130 { break }
             app.swipeUp()
         }
         XCTAssertTrue(video.waitForExistence(timeout: 35))
@@ -142,11 +142,29 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(app.buttons["第1集"].firstMatch.waitForExistence(timeout: 30))
         capture("16-auete-episodes")
         app.buttons["第1集"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["系统播放"].waitForExistence(timeout: 50))
-        capture("17-auete-web-media")
-        app.buttons["系统播放"].tap()
+        let native = app.descendants(matching: .any).matching(identifier: "native-player").firstMatch
+        if !native.waitForExistence(timeout: 12) {
+            XCTAssertTrue(app.buttons["系统播放"].waitForExistence(timeout: 40))
+            capture("17-auete-web-media")
+            app.buttons["系统播放"].tap()
+        }
         assertPlaying()
         capture("18-auete-system-playing")
+        app.buttons["完成"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        query.tap()
+        query.typeText("折月亮\n")
+        let status = app.staticTexts["折月亮"].firstMatch
+        let verification = app.buttons["source-verify"]
+        let ready = NSPredicate { _, _ in status.exists || verification.exists }
+        expectation(for: ready, evaluatedWith: nil)
+        waitForExpectations(timeout: 35)
+        if verification.exists {
+            verification.tap()
+            XCTAssertTrue(app.buttons["验证完成，重试"].waitForExistence(timeout: 10))
+            capture("19-auete-search-verification")
+            app.buttons["关闭"].tap()
+        }
     }
 
     private func assertPlaying() {
