@@ -2,12 +2,12 @@
 
 ## 0.4.0 回归（当前交付）
 
-检查日期：2026-11-11，亚洲 / 上海。最终构建 [GitHub Actions 42962316622](https://github.com/Jwforever/iMovie/actions/runs/42962316622)，应用代码提交 `8f52b961e7f161d20db1328a2173d1a71c11a26a`，Xcode 16.4 / iOS SDK 18.5。交付文档补入本次结果，应用代码与该构建一致。
+检查日期：2026-11-11，亚洲 / 上海。最终构建 [GitHub Actions 42970895739](https://github.com/Jwforever/iMovie/actions/runs/42970895739) 成功，应用代码提交 `37d2660ef5f27c7a9d318e49bbc43d85eab2c4cc`，Xcode 16.4 / iOS SDK 18.5。交付应用源码与该构建一致，构建后仅更新 README / docs 说明。
 
 | 验证 | 最终结果 |
 | --- | --- |
-| Swift 核心测试 | 32 项全部通过，0 失败、0 跳过 |
-| iPhone 16 / iOS 18.5 UI 测试 | 8 项全部通过，0 失败、0 跳过 |
+| Swift 核心测试 | 37 项全部通过，0 失败、0 跳过 |
+| iPhone 16 / iOS 18.5 UI 测试 | 9 项全部通过，0 失败、0 跳过 |
 | Python 工具测试 | 8 项通过 |
 | 浏览器观察脚本测试 | 1 项通过；原有脚本仍用于网站验证码页辅助，不是新版播放必经路径 |
 | 真机平台构建 | iPhoneOS arm64 Release，iOS 16+，未签名 IPA 生成通过 |
@@ -22,12 +22,16 @@
 5. 两栏全局搜索：左侧「全部源」与窄站点列表，右侧按相关度排序。测试故意让无关结果先从接口返回，最终完整片名优先；筛选一个来源后其他来源结果隐藏，切回「全部源」恢复。
 6. 轮播可滑动，点选后查当前来源同名作品；关于页显示 by Chris Wei 与 GitHub 地址。UI 使用本地评分样例保证可重复，生产豆瓣公开榜单另有真实 HTTP 读取验证；该样例不会打包进 IPA。评分至少 7 分、100 人评价，未读取到评分则回退来源推荐。
 7. 海报同页复用、首页到详情共享；应用终止后重启仍读磁盘，同一 URL 只请求一次，清理缓存后再访问才触发第二次请求。片库缓存的持久化与清理由核心测试覆盖。图片缓存 32 MB 内存 / 120 MB 磁盘，14 天更新；片库 3 分钟、豆瓣推荐 6 小时，片库 / 推荐磁盘上限 16 MB。配置、搜索和视频取址不走片库缓存。
+8. 未知 `csp_FutureGuard` 从 `ext.siteUrl` 进入公共 HTML 适配 → 列表 / 详情 / 选集 → HTTP 提取 → AVPlayer；断言没有 WKWebView。缺域名来源直接进入并显示具体错误；从错误页补充地址保存后重新加载，终止 App 再启动仍能读取该源内容。该流程最终构建通过。
+9. 通用核心行为覆盖未来配置携带 `ios` 规则、未知 CSP 独立搜索、奥特 / MacCMS HTML、缺域名提示和真实下一页链接识别。没有对剩余 34 源设置逐源实测通过的开放门槛。
 
-全部 Android 源移植**尚未完成**。重新核查原配置仍为 45 个 Android 条目，对应 37 个不同 API 实现；本版独立实现识别其中 11 个，加上兔小贝共 12 个条目、6 套本机适配。34 个 Android 条目和 2 个 drpy 条目仍待移植。逐源状态见 [source-port-status.json](source-port-status.json)。急救教学新增目录、搜索与公开 MP4 适配，已实测公开目录和视频链接并通过核心解析测试，尚未做该源 iOS 完整播放验证。
+全部 45 个 Android 条目已开放，涉及 37 个不同 API 实现；11 个使用专用 Swift 实现，剩余 34 个统一进入 HTML / JSON 通用尝试，未知类名在更新配置后自动纳入。兔小贝另有专用实现，共 12 个专用配置条目。通用框架已有本地完整播放与持久化测试，剩余 34 个实际站点没有逐一验证，也没有执行原 Guard 协议。只有类名或不可读数据时需补充网址；网盘登录、直播签名、磁力等协议仍不完整，不能声称全源可播。2 个 drpy 条目没有完整宿主。逐源状态见 [source-port-status.json](source-port-status.json)，规则格式见 [通用来源规则](generic-source-rules.md)。急救教学的公开目录和 MP4 已有网络 / 核心测试，尚未做该源 iOS 完整播放验证。
 
 奥特搜索仍可能需要用户完成网站验证码，自动化仅打开验证入口，没有代填或绕过。立播和厂长访问限制仍存在；网站域名、登录、签名或访问策略变化会影响播放。版本 0.3 的 WebKit 播放证据保留于下文，用于追踪，不代表 0.4 当前播放路径。
 
-最终截图位于 `dist/screenshots/0.4.0/`：`18-auete-system-playing.png`、`11-dm84-system-playing.png`、`23-inline-landscape.png`、`24-inline-portrait.png`、`20-global-search-results.png`、`22-global-search-filtered.png`、`25-douban-carousel.png`、`26-about-imovie.png` 和 `27-poster-cache.png`。
+最终截图位于 `dist/screenshots/0.4.0/`：真实来源播放、横竖屏、两栏搜索、轮播、关于与缓存，以及 `28-generic-source-playing.png`、`29-generic-source-error.png`、`30-generic-rule-persisted.png`。`31-live-douban-home.png` 为真实源测试环境中的首页，`25-douban-carousel.png` 为可重复测试的本地榜单样例。
+
+中间构建 `42969169687` 的 37 项核心通过、8 项 UI 通过，奥特 UI 因大幅滚动使卡片被固定分类栏遮挡而未进入详情，记录为失败。已将测试改为按卡片位置小幅拖动并断言卡片完整可见，没有把该失败改记为站点不可用或跳过，也不影响其余来源开放。前一构建 `42967802081` 的 36 核心 / 9 UI 全部通过。
 
 ## 0.3.0 回归
 
