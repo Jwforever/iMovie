@@ -39,6 +39,8 @@ final class AppStore: ObservableObject {
     @Published var playback: PlaybackRequest?
     @Published private(set) var homeSourceKey: String
     @Published private(set) var health: [String: SourceHealth] = [:]
+    /// 导入配置时定下来的固定顺序；界面只按它渲染，不随后台探测跳动。
+    @Published private(set) var sourceOrder: [String] = []
     private var sourceRules: [String: GenericSourceRule]
 
     var homeSource: SourceSite? {
@@ -51,6 +53,7 @@ final class AppStore: ObservableObject {
     func selectHomeSource(_ site: SourceSite) {
         homeSourceKey = site.key
         defaults.set(site.key, forKey: "homeSourceKey")
+        rebuildSourceOrder()
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -72,6 +75,7 @@ final class AppStore: ObservableObject {
         history = Self.load([WatchRecord].self, key: "history", defaults: storage) ?? []
         health = Self.load([String: SourceHealth].self, key: "sourceHealth", defaults: storage) ?? [:]
         sourceRules = Self.load([String: GenericSourceRule].self, key: "sourceRules", defaults: storage) ?? [:]
+        sourceOrder = Self.load([String].self, key: "sourceOrder", defaults: storage) ?? []
         SpiderSource.shared.update(config?.spider)
     }
 
@@ -84,6 +88,23 @@ final class AppStore: ObservableObject {
 
     /// 3 有内容，2 未测过，1 拉到空列表，0 请求失败
     func rank(of site: SourceSite) -> Int { health[site.key]?.rank ?? 2 }
+
+    /// 固定顺序下的来源列表，界面只读这个。
+    var orderedSites: [SourceSite] {
+        SourceOrdering.apply(order: sourceOrder, to: config?.sites ?? [])
+    }
+
+    /// 重算并保存顺序。只在导入配置、探测整批结束、切换默认源时调用，
+    /// 保证列表不会在浏览过程中自己重排。
+    func rebuildSourceOrder() {
+        guard let config else { return }
+        let ranks = config.sites.reduce(into: [String: Int]()) { result, site in
+            result[site.key] = rank(of: site)
+        }
+        let ordered = SourceOrdering.arrange(config.sites, ranks: ranks, preferred: homeSource?.key)
+        sourceOrder = ordered.map(\.key)
+        persist(sourceOrder, key: "sourceOrder")
+    }
 
     /// 试拉一个来源的首屏，结果写进 health，让列表能自己把可用的排上去。
     func probe(_ site: SourceSite) async {
@@ -110,6 +131,8 @@ final class AppStore: ObservableObject {
             config = result
             persist(result, key: "config")
             defaults.set(configURL, forKey: "configURL")
+            // 顺序在导入时一次定好，之后不再随探测结果变化。
+            rebuildSourceOrder()
             SpiderSource.shared.update(result.spider)
             // 插件解析在后台预热：首屏按需触发，失败只影响单个来源。
             Task.detached { await GuardRuleCatalog.shared.prepare(spider: result.spider) }

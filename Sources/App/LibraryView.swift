@@ -58,17 +58,9 @@ import SwiftUI
     @State private var filter = ""
     @State private var probing = false
 
+    /// 只用导入配置时定下的固定顺序；探测结果不会在浏览过程中改变这里。
     private var sites: [SourceSite] {
-        let filtered = (store.config?.sites ?? []).filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
-        // 排序：默认源固定第一；其余按最近一次真实拉取结果，出过片的在前，
-        // 没测过的居中，失败的沉底；同分保持配置顺序。
-        return filtered.enumerated().sorted { lhs, rhs in
-            let leftDefault = lhs.element.key == store.homeSource?.key
-            let rightDefault = rhs.element.key == store.homeSource?.key
-            if leftDefault != rightDefault { return leftDefault }
-            let left = store.rank(of: lhs.element), right = store.rank(of: rhs.element)
-            return left == right ? lhs.offset < rhs.offset : left > right
-        }.map(\.element)
+        store.orderedSites.filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
     }
 
     var body: some View {
@@ -108,6 +100,8 @@ import SwiftUI
             }
             index += 4
         }
+        // 全部测完只重排一次，避免列表在用户眼前跳动。
+        if !Task.isCancelled { store.rebuildSourceOrder() }
     }
 
     private func sourceRow(_ site: SourceSite) -> some View {
