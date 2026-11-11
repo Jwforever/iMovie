@@ -160,7 +160,10 @@ public struct GenericSourceAdapter {
             let name = try link.text()
             if !name.isEmpty && name.count < 15 { categories.append(VideoCategory(id: url.absoluteString, name: name)) }
         }
-        let next = try doc.select("a[href]").array().contains { try $0.text().contains("下一页") && !$0.attr("href").isEmpty }
+        let next = try doc.select("a[href]").array().contains { node in
+            let text = try node.text(), href = try node.attr("href")
+            return text.contains("下一页") && !href.isEmpty && href != "#"
+        }
         if videos.isEmpty && categories.isEmpty { throw ViewerError.message("已连接来源，但通用规则没有识别出影片。可修改列表 / 标题选择器，或检查站点验证提示。") }
         return VideoPage(categories: categories, videos: videos, page: max(1, page), pageCount: next ? max(1, page) + 1 : max(1, page))
     }

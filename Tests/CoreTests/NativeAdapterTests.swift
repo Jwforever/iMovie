@@ -17,7 +17,7 @@ final class NativeAdapterTests: XCTestCase {
         XCTAssertEqual(result.sites[1].runtime, .javascript)
         XCTAssertEqual(result.sites[2].runtime, .android)
         XCTAssertEqual(result.sites[2].extensionValue, "rfOIzPkSUkANv6AT/==")
-        XCTAssertEqual(result.nativeSites.count, 1)
+        XCTAssertEqual(result.nativeSites.count, 2)
     }
 
     func testJSONPCategoryWithUnrelatedSiteFieldsAndEmptyPages() throws {

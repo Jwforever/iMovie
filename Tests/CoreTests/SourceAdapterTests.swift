@@ -6,7 +6,7 @@ final class SourceAdapterTests: XCTestCase {
     func testGuardEntriesSelectLocalImplementations() throws {
         let data = Data(#"{"sites":[{"key":"dm","name":"动漫","api":"csp_Dm84Guard","type":3},{"key":"bili","api":"csp_BiliGuard","type":3},{"key":"unknown","api":"csp_UnknownGuard","type":3}]}"#.utf8)
         let config = try ConfigDecoder.decode(data, sourceURL: URL(string: "https://example.test/tv")!)
-        XCTAssertEqual(config.nativeSites.count, 2)
+        XCTAssertEqual(config.nativeSites.count, 3)
         XCTAssertEqual(config.sites[0].nativeAdapter, .dm84)
         XCTAssertEqual(config.sites[1].nativeAdapter, .bilibili)
         XCTAssertEqual(config.sites[2].runtime, .android)
