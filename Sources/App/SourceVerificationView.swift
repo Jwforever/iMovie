@@ -26,7 +26,9 @@ import WebKit
             .background(Theme.backdrop)
             .navigationTitle("来源验证").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { dismiss() }.accessibilityIdentifier("source-verification-close")
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("验证完成，重试") {
                         Task {

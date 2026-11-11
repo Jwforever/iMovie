@@ -74,10 +74,10 @@ GitHub 私有仓库内已运行 `.github/workflows/ios.yml`。在 Actions 中选
 
 ## 验证
 
-- 21 项 Swift 核心测试通过。
+- 25 项 Swift 核心测试通过。
 - 8 项 Python 工具测试通过。
 - 1 项浏览器测试通过，覆盖 DOM / fetch / iframe 媒体识别、去重、URL scheme 过滤、跨 iframe 暂停。
-- 3 项 iOS 模拟器界面测试通过，覆盖本地配置及播放、收藏重播和记录、网页切换系统播放、真实配置与动漫巴士播放。
+- iOS 模拟器覆盖首页切源、分类、重启保留来源、聚合搜索，本地播放、收藏和最近播放，网页转系统播放，真实配置与动漫巴士、奥特来源。最终结果见验证记录及交付构建信息。
 - 真机 arm64 Release 构建及 IPA 打包通过；未在实体 iPhone 安装或验证 AirPlay / 画中画。
 
 完整证据和限制见 [验证记录](docs/validation.md)。运行方法：

@@ -113,6 +113,16 @@ final class PlaybackUITests: XCTestCase {
         app.terminate()
         app.launch()
         XCTAssertTrue(app.staticTexts["第二来源样片"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["搜索"].tap()
+        let query = app.textFields["global-search-query"]
+        query.tap()
+        query.typeText("样片\n")
+        let summary = app.staticTexts["search-summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 10))
+        let completed = NSPredicate(format: "label CONTAINS %@", "2 个有结果")
+        expectation(for: completed, evaluatedWith: summary)
+        waitForExpectations(timeout: 10)
+        capture("20-global-search-results")
     }
 
     func testAueteBrowseEpisodesAndSearchVerification() throws {
@@ -165,7 +175,7 @@ final class PlaybackUITests: XCTestCase {
             verification.tap()
             XCTAssertTrue(app.buttons["验证完成，重试"].waitForExistence(timeout: 10))
             capture("19-auete-search-verification")
-            app.buttons["关闭"].tap()
+            app.buttons["source-verification-close"].tap()
         }
     }
 

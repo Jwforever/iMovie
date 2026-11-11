@@ -24,7 +24,9 @@ struct SiteSearchResult: Identifiable {
         List {
             HStack {
                 TextField("搜索影片、剧集或视频", text: $query).submitLabel(.search).onSubmit { search() }
+                    .accessibilityIdentifier("global-search-query")
                 Button(action: search) { Image(systemName: "magnifyingglass") }.accessibilityLabel("搜索")
+                    .accessibilityIdentifier("global-search-submit")
             }
             if searching { ProgressView("正在搜索 · \(results.count) / \(total) 个站点已返回") }
             if let config = store.config {
