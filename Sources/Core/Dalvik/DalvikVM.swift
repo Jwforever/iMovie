@@ -273,7 +273,7 @@ final class DalvikVM {
                 case 0x1D, 0x1E:
                     break
                 case 0x27:
-                    if let object = registers[a8].asObject { throw DalvikThrown(object) }
+                    if let object = registers[a8].asObject { throw DalvikThrown(object: object) }
 
                 // ---- 类型 ----
                 case 0x1F:
