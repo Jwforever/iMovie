@@ -15,7 +15,7 @@ public enum SourceRuntime: String, Codable {
         switch self {
         case .jsonAPI: return "JSON 接口"
         case .nativePort: return "本机适配·实验"
-        case .android: return "待移植"
+        case .android: return "通用试配"
         case .javascript: return "脚本待适配"
         case .unsupported: return "暂未适配"
         }
@@ -25,7 +25,7 @@ public enum SourceRuntime: String, Codable {
         switch self {
         case .jsonAPI: return "可尝试在本机浏览。播放仍取决于接口是否返回 iOS 支持的媒体地址。"
         case .nativePort: return "已为这个来源编写独立的 iOS 适配。应用直接请求对应网站，不执行 Android 爬虫；当前适配仍需要真机验证。"
-        case .android: return "这个源的现成插件依赖 Android。iPhone 独立使用需要为对应网站另写本机规则；当前尚未移植这个源。"
+        case .android: return "使用通用网页 / JSON 规则尝试采集。可补充来源地址和规则；运行时会显示具体错误，不执行 Android 插件。"
         case .javascript: return "这个源依赖 drpy 等宿主环境。当前版本尚未提供兼容的脚本引擎，无法直接搜索或解析。"
         case .unsupported: return "当前版本尚未实现这个接口格式。"
         }
@@ -39,9 +39,11 @@ public struct SourceSite: Codable, Identifiable, Hashable {
     public var api: String
     public var searchable: Bool
     public var extensionValue: String? = nil
+    public var genericRule: GenericSourceRule? = nil
     public var id: String { key }
 
     public var runtime: SourceRuntime {
+        if genericRule != nil { return .android }
         if nativeAdapter != nil { return .nativePort }
         if api.lowercased().hasPrefix("csp_") { return .android }
         if let url = HTTPAddress.optional(api), url.path.lowercased().hasSuffix(".js") { return .javascript }
@@ -49,7 +51,8 @@ public struct SourceSite: Codable, Identifiable, Hashable {
         return .unsupported
     }
 
-    public var isNative: Bool { runtime == .jsonAPI || runtime == .nativePort }
+    public var isNative: Bool { runtime == .jsonAPI || runtime == .nativePort || usesGenericAdapter }
+    public var usesGenericAdapter: Bool { genericRule != nil || (nativeAdapter == nil && api.lowercased().hasPrefix("csp_")) }
 
     public var nativeAdapter: NativeSourceAdapter? {
         NativeSourceAdapter.identify(type: type, api: api, extensionValue: extensionValue)
@@ -106,7 +109,7 @@ public struct SourceConfig: Codable {
         var groups: [SourceSearchTarget] = []
         var indexes: [String: Int] = [:]
         for site in nativeSites where site.searchable {
-            let key = site.nativeAdapter.map {
+            let key = site.usesGenericAdapter ? "generic:" + site.key : site.nativeAdapter.map {
                 "native:" + $0.rawValue + ($0 == .bilibili ? "" : "|" + (site.extensionValue ?? ""))
             } ?? "api:\(site.type):\(site.api)"
             if let index = indexes[key] { groups[index].aliases.append(site) }

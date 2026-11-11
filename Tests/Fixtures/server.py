@@ -41,6 +41,17 @@ def handler(media: bytes):
                 content_type = "video/mp4"
             elif parsed.path == "/tv":
                 suffix = "?image=" + query["image"][0] if query.get("image") else ""
+                if query.get("generic"):
+                    config = {"sites": [{"key": "future", "name": "未来来源", "type": 3, "api": "csp_FutureGuard", "ext": {"siteUrl": origin + "/generic/"}},
+                                        {"key": "missing", "name": "缺少域名来源", "type": 3, "api": "csp_MissingGuard"}], "lives": []}
+                    body = json.dumps(config, ensure_ascii=False).encode("utf-8")
+                    content_type = "application/json; charset=utf-8"
+                    self.send_response(200)
+                    self.send_header("Content-Type", content_type)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
                 config = {"sites": [{"key": "fixture", "name": "演示片库", "type": 1, "api": origin + "/api" + suffix},
                                     {"key": "fixture-two", "name": "第二来源", "type": 1, "api": origin + "/api-two" + suffix}],
                           "lives": [{"name": "演示直播", "url": origin + "/live.m3u"}]}
@@ -94,6 +105,15 @@ def handler(media: bytes):
                     count = image_requests.get(query.get("key", ["default"])[0], 0)
                 body = json.dumps({"requests": count}).encode()
                 content_type = "application/json"
+                self.send_response(200)
+            elif parsed.path == "/generic/":
+                body = ("<html><nav><a href='/generic/'>电影</a></nav><li data-href='/generic/detail.html'>"
+                        "<a href='/generic/detail.html'><img src='/poster.png?key=generic'></a><h2><a href='/generic/detail.html'>通用规则样片</a></h2></li></html>").encode("utf-8")
+                content_type = "text/html; charset=utf-8"
+                self.send_response(200)
+            elif parsed.path == "/generic/detail.html":
+                body = ("<html><h1 class='detail-title'>通用规则样片</h1><ul class='episode-list'><li><a href='/web'>第1集</a></li></ul></html>").encode("utf-8")
+                content_type = "text/html; charset=utf-8"
                 self.send_response(200)
             else:
                 self.send_error(404)

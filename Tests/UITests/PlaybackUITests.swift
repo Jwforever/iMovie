@@ -293,6 +293,29 @@ final class PlaybackUITests: XCTestCase {
         capture("27-poster-cache")
     }
 
+    func testUnknownAndroidSourceOpensGenericPipelineAndReportsMissingAddress() throws {
+        app.terminate()
+        app.launchEnvironment["IMOVIE_CONFIG_URL"] = "http://127.0.0.1:8765/tv?generic=1"
+        app.launch()
+        app.tabBars.buttons["设置"].tap()
+        app.buttons["config-import"].tap()
+        XCTAssertTrue(app.staticTexts["兼容情况"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["首页"].tap()
+        XCTAssertTrue(app.staticTexts["通用规则样片"].waitForExistence(timeout: 10))
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "video-card-")).firstMatch.tap()
+        XCTAssertTrue(app.buttons["episode-第1集"].waitForExistence(timeout: 5))
+        app.buttons["episode-第1集"].tap()
+        assertPlaying()
+        XCTAssertEqual(app.webViews.count, 0)
+        capture("28-generic-source-playing")
+        app.buttons["detail-back"].tap()
+        app.buttons["home-source-picker"].tap()
+        app.buttons["source-missing"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "没有提供可读取的网站地址")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["来源地址 / 通用规则"].exists)
+        capture("29-generic-source-error")
+    }
+
     private func imageRequests(_ key: String) throws -> Int {
         let ready = expectation(description: "Image request counter")
         var count = -1

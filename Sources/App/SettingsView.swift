@@ -27,11 +27,12 @@ import SwiftUI
                     LabeledContent("点播来源", value: "\(config.sites.count)")
                     LabeledContent("本机 JSON 接口", value: "\(config.sites.filter { $0.runtime == .jsonAPI }.count)")
                     LabeledContent("本机移植（实验）", value: "\(config.sites.filter { $0.runtime == .nativePort }.count)")
-                    LabeledContent("Android 爬虫", value: "\(config.sites.filter { $0.runtime == .android }.count)")
+                    LabeledContent("通用规则尝试", value: "\(config.sites.filter(\.usesGenericAdapter).count)")
                     LabeledContent("待适配脚本", value: "\(config.sites.filter { $0.runtime == .javascript }.count)")
                     LabeledContent("直播列表", value: "\(config.lives.count)")
                     LabeledContent("更新于", value: config.importedAt.formatted(date: .abbreviated, time: .shortened))
-                    Text("iMovie 按 iPhone 独立使用开发。已移植来源通过本机适配运行，其余 Android 插件与 drpy 脚本仍需逐步适配。")
+                    NavigationLink("来源地址 / 通用规则") { SourceRulesView() }.accessibilityIdentifier("settings-source-rules")
+                    Text("所有 Android 来源开放通用尝试，不以验证状态隐藏；可补充地址 / 规则，报错显示实际原因。专用适配与通用试配不代表全部 Android 插件已兼容。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

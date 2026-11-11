@@ -13,7 +13,7 @@ public struct TVAPIClient {
 
     /// TVBox home separates the categories document from optional home videos.
     public func home(site: SourceSite) async throws -> VideoPage {
-        if site.nativeAdapter != nil { return try await loadPage(site: site, category: nil, search: nil, page: 1) }
+        if site.nativeAdapter != nil || site.usesGenericAdapter { return try await loadPage(site: site, category: nil, search: nil, page: 1) }
         let root = try await object(site: site, query: site.type == 4 ? ["filter": "true"] : [:])
         let home = Self.decodePage(root, baseURL: try HTTPAddress.parse(site.api))
         if !home.videos.isEmpty { return home }
@@ -23,6 +23,7 @@ public struct TVAPIClient {
     }
 
     private func loadPage(site: SourceSite, category: String?, search: String?, page: Int) async throws -> VideoPage {
+        if site.usesGenericAdapter { return try await GenericSourceAdapter(site: site).page(category: category, search: search, page: page) }
         if site.nativeAdapter == .firstAid { return try await FirstAidAdapter().page(category: category, search: search, page: page) }
         if site.nativeAdapter == .auete { return try await AueteAdapter().page(category: category, search: search, page: page) }
         if site.nativeAdapter == .tuxiaobei {
@@ -39,6 +40,7 @@ public struct TVAPIClient {
     }
 
     public func detail(site: SourceSite, id: String) async throws -> Video {
+        if site.usesGenericAdapter { return try await GenericSourceAdapter(site: site).detail(id: id) }
         if site.nativeAdapter == .firstAid { return try await FirstAidAdapter().detail(id: id) }
         if site.nativeAdapter == .auete { return try await AueteAdapter().detail(id: id) }
         if site.nativeAdapter == .tuxiaobei { return try await TuxiaobeiAdapter().detail(id: id) }
@@ -58,6 +60,7 @@ public struct TVAPIClient {
     }
 
     private func resolveLink(site: SourceSite, episode: Episode, flag: String, title: String) async throws -> MediaLink {
+        if site.usesGenericAdapter { return try await GenericSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
         if site.nativeAdapter == .firstAid { return try FirstAidAdapter().resolve(episode: episode, title: title, group: site.name) }
         if site.nativeAdapter == .auete { return try await AueteAdapter().resolve(episode: episode, title: title, group: site.name) }
         if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).resolve(episode: episode, title: title) }

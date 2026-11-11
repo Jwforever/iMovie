@@ -9,7 +9,7 @@ import SwiftUI
     var body: some View {
         Group {
             if let site = store.homeSource {
-                SiteView(site: site, embedded: true).id(site.id)
+                SiteView(site: site, embedded: true).id(site)
             } else {
                 VStack(spacing: 22) {
                     Image(systemName: "play.rectangle.on.rectangle.fill")
@@ -64,9 +64,11 @@ import SwiftUI
     var body: some View {
         NavigationStack {
             List {
-                Section("可在本机打开") {
-                    ForEach(sites.filter(\.isNative)) { sourceRow($0) }
-                    if sites.filter(\.isNative).isEmpty { Text("尚未找到已适配来源").foregroundStyle(.secondary) }
+                Section("专用适配 / JSON 接口") {
+                    ForEach(sites.filter { $0.isNative && !$0.usesGenericAdapter }) { sourceRow($0) }
+                }
+                if sites.contains(where: \.usesGenericAdapter) {
+                    Section("通用尝试 · 点击直接打开") { ForEach(sites.filter(\.usesGenericAdapter)) { sourceRow($0) } }
                 }
                 if sites.contains(where: { !$0.isNative }) {
                     Section("其他来源") { ForEach(sites.filter { !$0.isNative }) { sourceRow($0) } }
@@ -87,7 +89,7 @@ import SwiftUI
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(site.name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
-                    Text(site.isNative ? (site.searchable ? "分类 · 搜索 · 选集" : "分类 · 选集") : site.runtime.title)
+                    Text(site.usesGenericAdapter ? "通用规则 · 可能需要来源地址" : site.isNative ? (site.searchable ? "分类 · 搜索 · 选集" : "分类 · 选集") : site.runtime.title)
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -187,6 +189,9 @@ import SwiftUI
                         .accessibilityIdentifier("home-content-heading")
                         if let error {
                             EmptyPanel(icon: "wifi.exclamationmark", title: "加载失败", message: error)
+                            if site.usesGenericAdapter {
+                                NavigationLink("来源地址 / 通用规则") { SourceRuleEditor(site: site) }.buttonStyle(.borderedProminent)
+                            }
                             if site.nativeAdapter == .auete {
                                 Button("在网页中验证后重试") { verifyingSource = true }
                                     .buttonStyle(.borderedProminent).accessibilityIdentifier("source-verify")

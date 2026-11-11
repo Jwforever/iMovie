@@ -43,7 +43,8 @@ public enum ConfigDecoder {
             return SourceSite(
                 key: key, name: JSONValue.text(item["name"]).isEmpty ? key : JSONValue.text(item["name"]),
                 type: JSONValue.integer(item["type"], default: -1), api: resolved,
-                searchable: JSONValue.flag(item["searchable"], default: true), extensionValue: extensionValue
+                searchable: JSONValue.flag(item["searchable"], default: true), extensionValue: extensionValue,
+                genericRule: GenericSourceAdapter.embeddedRule(item["ios"] ?? item["iMovie"])
             )
         }
         let lives: [LiveSource] = (root["lives"] as? [[String: Any]] ?? []).compactMap { item in

@@ -15,7 +15,7 @@ final class HomeSourceTests: XCTestCase {
         ]}
         """#
         let config = try ConfigDecoder.decode(Data(text.utf8), sourceURL: URL(string: "https://example.test/tv")!)
-        XCTAssertEqual(config.searchTargets.map(\.site.key), ["bili-doc", "auete", "dm84"])
+        XCTAssertEqual(config.searchTargets.map(\.site.key), ["bili-doc", "auete", "dm84", "unknown"])
         XCTAssertEqual(config.searchTargets[0].aliases.map(\.key), ["bili-music"])
         XCTAssertEqual(config.searchTargets[1].site.nativeAdapter, .auete)
     }

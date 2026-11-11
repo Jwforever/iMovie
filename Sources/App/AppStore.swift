@@ -27,6 +27,7 @@ final class AppStore: ObservableObject {
     @Published var error: String?
     @Published var playback: PlaybackRequest?
     @Published private(set) var homeSourceKey: String
+    private var sourceRules: [String: GenericSourceRule]
 
     var homeSource: SourceSite? {
         guard let config else { return nil }
@@ -58,6 +59,7 @@ final class AppStore: ObservableObject {
         config = Self.load(SourceConfig.self, key: "config", defaults: storage)
         favorites = Self.load([MediaLink].self, key: "favorites", defaults: storage) ?? []
         history = Self.load([WatchRecord].self, key: "history", defaults: storage) ?? []
+        sourceRules = Self.load([String: GenericSourceRule].self, key: "sourceRules", defaults: storage) ?? [:]
     }
 
     func importConfig() async {
@@ -65,12 +67,25 @@ final class AppStore: ObservableObject {
         importing = true
         defer { importing = false }
         do {
-            let result = try await client.config(at: configURL)
+            var result = try await client.config(at: configURL)
+            for index in result.sites.indices {
+                if let rule = sourceRules[result.sites[index].key] { result.sites[index].genericRule = rule }
+            }
             config = result
             persist(result, key: "config")
             defaults.set(configURL, forKey: "configURL")
         } catch is CancellationError { }
         catch { self.error = error.localizedDescription }
+    }
+
+    func saveRule(_ rule: GenericSourceRule?, for site: SourceSite) {
+        sourceRules[site.key] = rule
+        persist(sourceRules, key: "sourceRules")
+        if var config, let index = config.sites.firstIndex(where: { $0.key == site.key }) {
+            config.sites[index].genericRule = rule
+            self.config = config
+            persist(config, key: "config")
+        }
     }
 
     func play(_ media: MediaLink, refresh: Bool = true) {
@@ -80,7 +95,8 @@ final class AppStore: ObservableObject {
             Task {
                 defer { resolvingPlayback = false }
                 do {
-                    let updated = try await TVAPIClient().resolve(site: reference.site, episode: reference.episode, flag: reference.flag, title: media.title)
+                    let site = config?.sites.first { $0.key == reference.site.key } ?? reference.site
+                    let updated = try await TVAPIClient().resolve(site: site, episode: reference.episode, flag: reference.flag, title: media.title)
                     play(updated, refresh: false)
                 } catch is CancellationError { }
                 catch { self.error = error.localizedDescription }

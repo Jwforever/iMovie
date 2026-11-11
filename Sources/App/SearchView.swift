@@ -157,7 +157,7 @@ private struct SearchHit: Identifiable {
     private var sourceInformation: some View {
         NavigationStack {
             List {
-                Text("同一站点的多个分类条目合并搜索。未完成适配或配置关闭搜索的来源不会参与。结果按片名完整匹配、前缀、包含关系与字符相关度排序。")
+                Text("所有 Android 来源开放通用搜索尝试，出错会显示原因；可在设置补充来源地址与规则。同站 B站分类合并查询，配置关闭搜索的来源仍不参与。结果按片名匹配度排序。")
                     .font(.subheadline).foregroundStyle(.secondary)
                 ForEach(store.config?.sites.filter { !$0.isNative || !$0.searchable } ?? []) { site in
                     LabeledContent(site.name, value: site.isNative ? "配置关闭搜索" : "待适配").font(.caption)
