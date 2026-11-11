@@ -1,0 +1,30 @@
+workflows:
+  ios-unsigned:
+    name: iMovie unsigned IPA
+    max_build_duration: 45
+    environment:
+      xcode: latest
+      vars:
+        PROJECT: iMovie.xcodeproj
+        SCHEME: iMovie
+    cache:
+      cache_paths:
+        - $HOME/Library/Caches/org.swift.swiftpm
+        - $HOME/Library/Developer/Xcode/DerivedData
+    scripts:
+      - name: Install XcodeGen
+        script: |
+          set -e
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+      - name: Run tests and build unsigned IPA
+        script: |
+          set -e
+          bash scripts/build-unsigned.sh
+    artifacts:
+      - dist/*.ipa
+      - dist/*.sha256
+      - dist/*.json
+      - build/DerivedData/Build/Products/Release-iphoneos/*.app
