@@ -15,6 +15,7 @@ final class DalvikVM {
     private var natives: [String: (DalvikVM, DalvikObject?, [DalvikValue]) throws -> DalvikValue] = [:]
     private var stackNames: [String] = []
     private var caught: DalvikValue = .ref(nil)
+    private(set) var invocationParameters: [String] = []
     let control: DalvikExecutionControl
     let httpSession: URLSession
     private let maximumSteps: Int
@@ -138,6 +139,9 @@ final class DalvikVM {
 
     private func callNative(_ method: DalvikMethod, _ args: [DalvikValue],
                             _ this: DalvikObject?) throws -> DalvikValue? {
+        let previous = invocationParameters
+        invocationParameters = method.params
+        defer { invocationParameters = previous }
         var owner: String? = method.owner
         var seen = Set<String>()
         while let current = owner, !seen.contains(current) {

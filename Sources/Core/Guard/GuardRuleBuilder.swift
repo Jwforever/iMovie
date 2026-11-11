@@ -83,7 +83,8 @@ enum GuardRuleBuilder {
         let search = methods["searchContent"] ?? []
         let initial = methods["<init>"] ?? []
 
-        guard let base = pickHost(initial) ?? pickHost(home) else { return nil }
+        let declared = initial + (methods["<clinit>"] ?? []) + (methods["init"] ?? []) + home
+        guard let base = pickHost(declared) ?? pickHost(profile.strings) ?? profile.hosts.first.map({ "https://" + $0 }) else { return nil }
         var rule = GenericSourceRule(baseURL: base)
         rule.mode = "html"
 
@@ -123,9 +124,8 @@ enum GuardRuleBuilder {
             template = template.replacingOccurrences(of: "wd=", with: "wd={wd}")
             if template.contains("{wd}") && (template.contains("page") || template.contains("pg=") || template.contains("p=")) {
                 template = replace(trailingPagePattern, in: template, with: "$1={pg}")
-            } else if template.contains("{wd}") {
-                template += "{pg}"
             }
+            template = template.replacingOccurrences(of: "%s", with: "{wd}")
             rule.searchURL = template
         }
 
@@ -221,7 +221,7 @@ enum GuardRuleBuilder {
         if matches(absoluteHostPattern, text) || text.hasPrefix("http") { return false }
         if matches(regexMetaPattern, text) { return false }
         let parts = text.split(whereSeparator: { $0 == " " || $0 == ">" }).map { String($0) }
-        guard !parts.isEmpty, parts.count <= 3 else { return false }
+        guard !parts.isEmpty, parts.count <= 8 else { return false }
         for part in parts {
             if !matches(selectorPattern, part) { return false }
             let decorated = part.contains(".") || part.contains("#") || part.contains("[")

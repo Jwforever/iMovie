@@ -17,6 +17,7 @@ enum DalvikNatives {
         network(vm)
         android(vm)
         aliases(vm)
+        javaSupport(vm)
     }
 
     // MARK: - 取值助手
@@ -82,11 +83,20 @@ enum DalvikNatives {
 
     private static func strings(_ vm: DalvikVM) {
         vm.register("Ljava/lang/String;", "<init>") { _, this, args in
-            this?.payload = string(args.first ?? .ref(nil)) ?? ""
+            if let array = args.first?.asObject?.items {
+                let start = args.count > 1 ? max(0, Int(args[1].intValue)) : 0
+                let count = args.count > 2 ? max(0, Int(args[2].intValue)) : array.count
+                let values = Array(array.dropFirst(start).prefix(count))
+                if args.first?.asObject?.className == "[B" {
+                    this?.payload = decode(Data(values.map { UInt8(truncatingIfNeeded: $0.intValue) }))
+                } else {
+                    this?.payload = String(decoding: values.map { UInt16(truncatingIfNeeded: $0.intValue) }, as: UTF16.self)
+                }
+            } else { this?.payload = string(args.first ?? .ref(nil)) ?? "" }
             return .ref(nil)
         }
         vm.register("Ljava/lang/String;", "length") { _, this, _ in
-            .int(Int32(this?.stringPayload?.count ?? 0))
+            .int(Int32(this?.stringPayload?.utf16.count ?? 0))
         }
         vm.register("Ljava/lang/String;", "isEmpty") { _, this, _ in
             .int((this?.stringPayload ?? "").isEmpty ? 1 : 0)
@@ -105,7 +115,7 @@ enum DalvikNatives {
             .ref(DalvikObject.string((this?.stringPayload ?? "").uppercased()))
         }
         vm.register("Ljava/lang/String;", "toCharArray") { _, this, _ in
-            let chars = Array((this?.stringPayload ?? "").unicodeScalars).map { DalvikValue.int(Int32($0.value)) }
+            let chars = (this?.stringPayload ?? "").utf16.map { DalvikValue.int(Int32($0)) }
             let object = DalvikObject(className: "[C")
             object.items = chars
             return .ref(object)
@@ -117,11 +127,10 @@ enum DalvikNatives {
             return .ref(object)
         }
         vm.register("Ljava/lang/String;", "charAt") { _, this, args in
-            let value = this?.stringPayload ?? ""
+            let value = Array((this?.stringPayload ?? "").utf16)
             let index = Int(args.first?.intValue ?? 0)
             guard index >= 0, index < value.count else { return .int(0) }
-            let char = value[value.index(value.startIndex, offsetBy: index)]
-            return .int(Int32(char.unicodeScalars.first?.value ?? 0))
+            return .int(Int32(value[index]))
         }
         vm.register("Ljava/lang/String;", "indexOf") { _, this, args in
             let value = this?.stringPayload ?? ""
@@ -210,6 +219,7 @@ enum DalvikNatives {
         vm.register("Ljava/lang/String;", "format") { _, _, args in
             let format = string(args.first ?? .ref(nil)) ?? ""
             var rest = Array(args.dropFirst())
+            if rest.count == 1, let values = rest.first?.asObject?.items { rest = values }
             var result = ""
             var index = format.startIndex
             while index < format.endIndex {
@@ -252,9 +262,11 @@ enum DalvikNatives {
                 this?.fields[bufferKey] = .ref(DalvikObject.string(string(args.first ?? .ref(nil)) ?? ""))
                 return .ref(nil)
             }
-            vm.register(className, "append") { _, this, args in
+            vm.register(className, "append") { vm, this, args in
                 let current = this?.fields[bufferKey]?.asObject?.stringPayload ?? ""
-                this?.fields[bufferKey] = .ref(DalvikObject.string(current + text(args.first)))
+                let character = vm.invocationParameters.last == "C"
+                let suffix = character ? String(decoding: [UInt16(truncatingIfNeeded: args.first?.intValue ?? 0)], as: UTF16.self) : text(args.first)
+                this?.fields[bufferKey] = .ref(DalvikObject.string(current + suffix))
                 return .ref(this)
             }
             vm.register(className, "toString") { _, this, _ in

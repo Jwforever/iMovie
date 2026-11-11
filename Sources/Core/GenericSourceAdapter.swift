@@ -358,6 +358,7 @@ public struct GenericSourceAdapter {
     static func expand(_ template: String, base: URL, query: String = "", page: Int = 1, category: String = "", id: String = "") throws -> URL {
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+#=?"))) ?? query
         let value = template.replacingOccurrences(of: "{query}", with: encodedQuery).replacingOccurrences(of: "{page}", with: String(max(1, page)))
+            .replacingOccurrences(of: "{pg}", with: String(max(1, page)))
             .replacingOccurrences(of: "{wd}", with: encodedQuery)
             .replacingOccurrences(of: "{category}", with: category).replacingOccurrences(of: "{id}", with: id)
             .replacingOccurrences(of: "{url}", with: id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+#=?"))) ?? id)

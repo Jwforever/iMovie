@@ -83,7 +83,8 @@ enum DalvikSpider {
 
     static func execute(dex: Data, shortName: String, action: DalvikSpiderAction,
                         ext: String, control: DalvikExecutionControl = DalvikExecutionControl(),
-                        httpSession: URLSession = .shared) throws -> DalvikRunResult {
+                        httpSession: URLSession = .shared, maximumSteps: Int = 20_000_000,
+                        timeout: TimeInterval = 45) throws -> DalvikRunResult {
         try control.checkCancellation()
         let started = Date()
         let image = try DalvikImage(data: dex)
@@ -91,7 +92,7 @@ enum DalvikSpider {
         guard image.classes[className] != nil else {
             throw ViewerError.message("插件里没有 \(shortName) 这个采集器。")
         }
-        let vm = DalvikVM(image: image, control: control, httpSession: httpSession)
+        let vm = DalvikVM(image: image, control: control, maximumSteps: maximumSteps, timeout: timeout, httpSession: httpSession)
         let spider = DalvikObject(className: className)
 
         if let ctor = vm.findMethod(className, "<init>", []) {
