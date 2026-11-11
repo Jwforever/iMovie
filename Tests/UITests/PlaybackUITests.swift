@@ -65,6 +65,7 @@ final class PlaybackUITests: XCTestCase {
     func testUserConfigAndDM84WebMedia() throws {
         app.terminate()
         app.launchEnvironment["IMOVIE_CONFIG_URL"] = "http://www.饭太硬.cc/tv"
+        app.launchEnvironment.removeValue(forKey: "IMOVIE_DOUBAN_URL")
         app.launch()
         app.tabBars.buttons["设置"].tap()
         app.buttons["config-import"].tap()
@@ -147,6 +148,7 @@ final class PlaybackUITests: XCTestCase {
     func testAueteBrowseEpisodesAndSearchVerification() throws {
         app.terminate()
         app.launchEnvironment["IMOVIE_CONFIG_URL"] = "http://www.饭太硬.cc/tv"
+        app.launchEnvironment.removeValue(forKey: "IMOVIE_DOUBAN_URL")
         app.launch()
         app.tabBars.buttons["设置"].tap()
         app.buttons["config-import"].tap()
@@ -308,6 +310,13 @@ final class PlaybackUITests: XCTestCase {
         let predicate = NSPredicate(format: "value == %@", "playing")
         expectation(for: predicate, evaluatedWith: player)
         waitForExpectations(timeout: 55)
+        let session = app.descendants(matching: .any).matching(identifier: "playback-session").firstMatch
+        let rendered = NSPredicate { _, _ in
+            let fields = (session.value as? String ?? "").components(separatedBy: "|")
+            return fields.count == 3 && fields[2] == "frame" && (Int(fields[1]) ?? 0) >= 3
+        }
+        expectation(for: rendered, evaluatedWith: nil)
+        waitForExpectations(timeout: 20)
     }
 
     private func capture(_ name: String) {
