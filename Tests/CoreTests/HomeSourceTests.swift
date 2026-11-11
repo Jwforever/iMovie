@@ -30,9 +30,10 @@ final class HomeSourceTests: XCTestCase {
         """#
         let page = try AueteAdapter.decodePage(Data(html.utf8), baseURL: URL(string: "https://www.aeete.com/Movie/index.html")!, page: 1)
         XCTAssertEqual(page.videos.count, 1)
-        XCTAssertEqual(page.videos[0].id, "/Movie/jqp/sample/")
-        XCTAssertEqual(page.videos[0].title, "电影 & 剧集")
-        XCTAssertEqual(page.videos[0].poster, "https://www.aeete.com/poster.webp")
+        let first = try XCTUnwrap(page.videos.first)
+        XCTAssertEqual(first.id, "/Movie/jqp/sample/")
+        XCTAssertEqual(first.title, "电影 & 剧集")
+        XCTAssertEqual(first.poster, "https://www.aeete.com/poster.webp")
         XCTAssertEqual(page.pageCount, 2)
         XCTAssertTrue(page.categories.contains { $0.name == "电视剧" })
         let url = try AueteAdapter.pageURL(category: "Movie", search: nil, page: 2)

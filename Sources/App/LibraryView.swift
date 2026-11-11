@@ -347,7 +347,7 @@ import SwiftUI
                 }
             Text(video.title).font(.system(size: 13, weight: .medium)).foregroundStyle(.primary).lineLimit(2)
                 .frame(height: 34, alignment: .topLeading)
-        }.accessibilityElement(children: .combine)
+        }
     }
 }
 

@@ -53,13 +53,14 @@ public struct AueteAdapter {
         for item in try doc.select("li[data-href], .carousel-item").array() {
             guard let anchor = try item.select("h2 a[href], a.carousel-link[href]").first() else { continue }
             let url = try HTTPAddress.parse(anchor.attr("href"), relativeTo: baseURL)
-            guard allowedHost(url), contentPath(url.path, episode: false), seen.insert(url.path).inserted else { continue }
+            let id = url.path.hasSuffix("/") ? url.path : url.path + "/"
+            guard allowedHost(url), contentPath(url.path, episode: false), seen.insert(id).inserted else { continue }
             let image = try item.select("img").first()
             let label = try anchor.text().trimmingCharacters(in: .whitespacesAndNewlines)
             let title = label.isEmpty ? (try image?.attr("alt") ?? "") : label
             let lazy = try image?.attr("data-original") ?? ""
             let poster = lazy.isEmpty ? (try image?.attr("src") ?? "") : lazy
-            videos.append(Video(id: url.path, title: title, poster: HTTPAddress.optional(poster, relativeTo: baseURL)?.absoluteString ?? "", note: try item.select(".hdtag").text(), summary: "", playFrom: "", playURL: ""))
+            videos.append(Video(id: id, title: title, poster: HTTPAddress.optional(poster, relativeTo: baseURL)?.absoluteString ?? "", note: try item.select(".hdtag").text(), summary: "", playFrom: "", playURL: ""))
         }
         if videos.isEmpty {
             let text = try doc.text()
@@ -107,8 +108,8 @@ public struct AueteAdapter {
     }
 
     private static func contentPath(_ path: String, episode: Bool) -> Bool {
-        let suffix = episode ? #"play-\d+-\d+\.html$"# : #"$"#
-        let pattern = #"^/(Movie|Tv|Zy|Dm|qita)/[A-Za-z0-9_-]+/[A-Za-z0-9_%.-]+/"# + suffix
+        let suffix = episode ? #"/play-\d+-\d+\.html$"# : #"/?$"#
+        let pattern = #"^/(Movie|Tv|Zy|Dm|qita)/[A-Za-z0-9_-]+/[A-Za-z0-9_%.-]+"# + suffix
         return path.range(of: pattern, options: .regularExpression) != nil
     }
 

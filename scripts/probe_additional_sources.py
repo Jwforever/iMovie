@@ -13,8 +13,9 @@ addresses = [
     "https://www.4kcz.com/", "https://czzy.top/", "https://www.cz4k.com/",
     "https://www.libvio.to/", "https://www.libvio.io/",
     "https://www.aeete.com/", "https://www.aeete.com/Movie/index.html",
-    "https://www.aeete.com/auete2so.php?searchword=" + urllib.parse.quote("唐") + "&page=1",
+    "https://www.aeete.com/auete4so.php?searchword=" + urllib.parse.quote("折月亮") + "&page=1",
     "https://www.aeete.com/Tv/neidi/zheyueliang/",
+    "https://www.aeete.com/Tv/neidi/zheyueliang/play-0-0.html",
     "https://auete.asia/", "https://dm84.tv/",
 ]
 
