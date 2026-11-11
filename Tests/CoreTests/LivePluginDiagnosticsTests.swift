@@ -21,7 +21,7 @@ final class LivePluginDiagnosticsTests: XCTestCase {
                         let name = site.pluginClassName ?? ""
                         if let profile = index.profiles[name] {
                             report["hosts"] = profile.hosts
-                            if let rule = GuardRuleBuilder.rule(for: profile) {
+                            if let rule = GuardRuleBuilder.rule(for: profile, ext: site.extensionValue) {
                                 report["rule"] = (try? JSONSerialization.jsonObject(with: JSONEncoder().encode(rule))) ?? [:]
                                 do {
                                     let request = URLRequest(url: try HTTPAddress.parse(rule.baseURL), timeoutInterval: 8)
@@ -38,12 +38,31 @@ final class LivePluginDiagnosticsTests: XCTestCase {
                         }
                         do {
                             let output = try await Task.detached {
-                                try DalvikSpider.execute(dex: dex, shortName: name, action: .home, ext: site.extensionValue ?? "",
-                                                         maximumSteps: 2_000_000, timeout: 8)
+                                var output = try DalvikSpider.execute(dex: dex, shortName: name, action: .home, ext: site.extensionValue ?? "",
+                                                         maximumSteps: 4_000_000, timeout: 12)
+                                if let page = CatVodPayload.page(output.json), page.videos.isEmpty, let category = page.categories.first {
+                                    let categoryOutput = try DalvikSpider.execute(dex: dex, shortName: name, action: .category(id: category.id, page: "1"), ext: site.extensionValue ?? "", maximumSteps: 4_000_000, timeout: 12)
+                                    output = categoryOutput
+                                }
+                                return output
                             }.value
                             report["interpreterVideos"] = CatVodPayload.page(output.json)?.videos.count ?? 0
                             report["interpreterRequests"] = output.requests.map { ["url": $0.url, "status": $0.code] as [String: Any] }
                             report["output"] = String(output.json.prefix(200))
+                            if let first = CatVodPayload.page(output.json)?.videos.first {
+                                report["firstVideo"] = ["id": first.id, "title": first.title, "poster": first.poster]
+                                do {
+                                    let detail = try await Task.detached {
+                                        try DalvikSpider.execute(dex: dex, shortName: name, action: .detail(id: first.id), ext: site.extensionValue ?? "", maximumSteps: 4_000_000, timeout: 12)
+                                    }.value
+                                    report["detailOutput"] = String(detail.json.prefix(500))
+                                    report["detailRequests"] = detail.requests.map { ["url": $0.url, "status": $0.code] as [String: Any] }
+                                    if let video = CatVodPayload.detail(detail.json) {
+                                        report["detailTitle"] = video.title
+                                        report["episodeCount"] = video.lines.reduce(0) { $0 + $1.episodes.count }
+                                    }
+                                } catch { report["detailError"] = error.localizedDescription }
+                            }
                         } catch { report["interpreterError"] = error.localizedDescription }
                         return report
                     }

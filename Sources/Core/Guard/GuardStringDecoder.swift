@@ -199,7 +199,7 @@ final class GuardStringDecoder {
                     var arguments: [Int] = []
                     if opcode >= 0x74 {
                         let first = registerWord & 0xFFFF
-                        let count = (registerWord >> 8) & 0xFF
+                        let count = (word >> 8) & 0xFF
                         arguments = (0..<count).map { first + $0 }
                     } else {
                         arguments = [registerWord & 0xF, (registerWord >> 4) & 0xF,
@@ -285,7 +285,7 @@ final class GuardStringDecoder {
                 var arguments: [Int] = []
                 if opcode >= 0x74 {
                     let first = registerWord & 0xFFFF
-                    let count = (registerWord >> 8) & 0xFF
+                    let count = (word >> 8) & 0xFF
                     arguments = (0..<count).map { first + $0 }
                 } else {
                     arguments = [registerWord & 0xF, (registerWord >> 4) & 0xF,

@@ -474,7 +474,12 @@ extension DalvikNatives {
         }
         vm.register("Lcom/github/catvod/crawler/SpiderDebug;", "log") { _, _, _ in .ref(nil) }
         vm.register("Lcom/github/catvod/crawler/Spider;", "<init>") { _, _, _ in .ref(nil) }
-        vm.register("Lcom/github/catvod/crawler/Spider;", "init") { _, _, _ in .ref(nil) }
+        vm.register("Lcom/github/catvod/crawler/Spider;", "init") { vm, this, args in
+            if args.count == 2, let this, let method = vm.findMethod(this.className, "init", ["Landroid/content/Context;"]) {
+                _ = try vm.invoke(method, [args[0]], this)
+            }
+            return .ref(nil)
+        }
         vm.register("Lcom/github/catvod/crawler/Spider;", "homeVideoContent") { _, _, _ in
             .ref(DalvikObject.string("{}"))
         }

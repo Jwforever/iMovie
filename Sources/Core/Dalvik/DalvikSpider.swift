@@ -102,6 +102,8 @@ enum DalvikSpider {
                                            ["Landroid/content/Context;", "Ljava/lang/String;"]) {
             let context = DalvikObject(className: "Landroid/content/Context;")
             _ = try vm.invoke(initializer, [.ref(context), .ref(DalvikObject.string(ext))], spider)
+        } else if let initializer = vm.findMethod(className, "init", ["Landroid/content/Context;"]) {
+            _ = try vm.invoke(initializer, [.ref(DalvikObject(className: "Landroid/content/Context;"))], spider)
         }
 
         let result: DalvikValue?
@@ -110,7 +112,17 @@ enum DalvikSpider {
             guard let method = vm.findMethod(className, "homeContent", ["Z"]) else {
                 throw ViewerError.message("\(shortName) 没有 homeContent。")
             }
-            result = try vm.invoke(method, [.int(1)], spider)
+            let home = try vm.invoke(method, [.int(1)], spider)
+            if let text = home?.asObject?.stringPayload, let page = CatVodPayload.page(text), page.videos.isEmpty,
+               let videos = vm.findMethod(className, "homeVideoContent", []) {
+                let content = try vm.invoke(videos, [], spider)
+                if let json = content?.asObject?.stringPayload, let output = CatVodPayload.page(json), !output.videos.isEmpty,
+                   var root = try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+                   let list = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] {
+                    root["list"] = list["list"]
+                    result = .ref(DalvikObject.string(String(decoding: try JSONSerialization.data(withJSONObject: root), as: UTF8.self)))
+                } else { result = home }
+            } else { result = home }
         case .category(let id, let page):
             guard let method = vm.findMethod(className, "categoryContent",
                                              ["Ljava/lang/String;", "Ljava/lang/String;",

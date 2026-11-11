@@ -6,6 +6,33 @@ extension DalvikNatives {
         func array(_ values: [DalvikValue], type: String = "Ljava/util/ArrayList;") -> DalvikValue {
             let object = DalvikObject(className: type); object.items = values; return .ref(object)
         }
+        for owner in ["Ljava/util/Random;", "Ljava/security/SecureRandom;"] {
+            vm.register(owner, "<init>") { _, _, _ in .ref(nil) }
+            vm.register(owner, "nextInt") { _, _, args in
+                if let bound = args.first?.intValue, bound > 0 { return .int(Int32.random(in: 0..<bound)) }
+                return .int(Int32.random(in: Int32.min...Int32.max))
+            }
+            vm.register(owner, "nextDouble") { _, _, _ in .double(Double.random(in: 0..<1)) }
+            vm.register(owner, "nextBytes") { _, _, args in
+                if let object = args.first?.asObject, let values = object.items { object.items = values.map { _ in .int(Int32.random(in: -128...127)) } }
+                return .ref(nil)
+            }
+        }
+        vm.register("Ljava/util/UUID;", "randomUUID") { _, _, _ in
+            let object = DalvikObject(className: "Ljava/util/UUID;"); object.payload = UUID().uuidString.lowercased(); return .ref(object)
+        }
+        vm.register("Ljava/util/UUID;", "fromString") { _, _, args in
+            let object = DalvikObject(className: "Ljava/util/UUID;"); object.payload = text(args.first).lowercased(); return .ref(object)
+        }
+        vm.register("Ljava/util/UUID;", "toString") { _, this, _ in .ref(DalvikObject.string(this?.stringPayload ?? "")) }
+        vm.register("Ljava/lang/Character;", "digit") { _, _, args in
+            let code = UInt32(truncatingIfNeeded: args.first?.intValue ?? 0)
+            let radix = Int(args.count > 1 ? args[1].intValue : 10)
+            guard (2...36).contains(radix), let scalar = Unicode.Scalar(code) else { return .int(-1) }
+            let character = Character(String(scalar))
+            let number = character.wholeNumberValue ?? (code >= 65 && code <= 90 ? Int(code - 65 + 10) : code >= 97 && code <= 122 ? Int(code - 97 + 10) : -1)
+            return .int(number >= 0 && number < radix ? Int32(number) : -1)
+        }
         vm.register("Ljava/util/Collections;", "emptyList") { _, _, _ in array([]) }
         vm.register("Ljava/util/Collections;", "singletonList") { _, _, args in array([args.first ?? .ref(nil)]) }
         vm.register("Ljava/util/Collections;", "unmodifiableList") { _, _, args in args.first ?? array([]) }

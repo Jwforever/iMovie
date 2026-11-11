@@ -145,8 +145,40 @@ final class DalvikImage {
             let classData = DalvikImage.u32(bytes, off + 24)
             let staticValues = DalvikImage.u32(bytes, off + 28)
             if classData > 0 { parseClassData(info, classData, staticValues) }
+            let annotations = DalvikImage.u32(bytes, off + 20)
+            if annotations > 0 {
+                let own = annotationSet(DalvikImage.u32(bytes, annotations))
+                info.genericSignature = own["Ldalvik/annotation/Signature;"]?["value"]?.asObject?.items?.map { $0.asObject?.stringPayload ?? "" }.joined() ?? ""
+                let count = DalvikImage.u32(bytes, annotations + 4)
+                for index in 0..<count {
+                    let base = annotations + 16 + index * 8
+                    let field = fieldRef(DalvikImage.u32(bytes, base))
+                    let values = annotationSet(DalvikImage.u32(bytes, base + 4))
+                    if let name = values["Lcom/google/gson/annotations/SerializedName;"]?["value"]?.asObject?.stringPayload {
+                        info.jsonNames[field.owner + "|" + field.name] = name
+                    }
+                }
+            }
             classes[name] = info
         }
+    }
+
+    private func annotationSet(_ offset: Int) -> [String: [String: DalvikValue]] {
+        guard offset > 0 else { return [:] }
+        var result: [String: [String: DalvikValue]] = [:]
+        for index in 0..<DalvikImage.u32(bytes, offset) {
+            let item = DalvikImage.u32(bytes, offset + 4 + index * 4)
+            let (type, first) = uleb(item + 1)
+            let (count, start) = uleb(first)
+            var p = start, values: [String: DalvikValue] = [:]
+            for _ in 0..<count {
+                let (key, next) = uleb(p)
+                let (value, end) = encodedValue(next)
+                values[string(key)] = value; p = end
+            }
+            result[typeName(type)] = values
+        }
+        return result
     }
 
     private func parseClassData(_ info: DalvikClassInfo, _ offset: Int, _ staticValues: Int) {
@@ -210,21 +242,22 @@ final class DalvikImage {
         let type = header & 0x1F
         let arg = header >> 5
         switch type {
-        case 0x00:
-            return (.ref(nil), p)
-        case 0x02, 0x03, 0x04, 0x06, 0x18:
+        case 0x00, 0x02, 0x03, 0x04, 0x06, 0x10, 0x11, 0x18:
             let n = arg + 1
             var raw: UInt64 = 0
             for i in 0..<n where p + i < bytes.count {
                 raw |= UInt64(bytes[p + i]) << (8 * i)
             }
             p += n
-            // 按字节数做符号扩展
-            if n < 8 {
+            if type == 0x10 { return (.float(Float(bitPattern: UInt32(truncatingIfNeeded: raw) << (8 * (4 - n)))), p) }
+            if type == 0x11 { return (.double(Double(bitPattern: raw << (8 * (8 - n)))), p) }
+            if type == 0x18 { return (.ref(DalvikObject.javaClass(typeName(Int(raw)))), p) }
+            // char 是无符号 UTF-16；byte/short/int/long 按位宽符号扩展。
+            if type != 0x03, n < 8 {
                 let signBit: UInt64 = UInt64(1) << UInt64(n * 8 - 1)
                 if raw & signBit != 0 { raw |= ~UInt64(0) << UInt64(n * 8) }
             }
-            if type == 0x06 || type == 0x18 { return (.long(Int64(bitPattern: raw)), p) }
+            if type == 0x06 { return (.long(Int64(bitPattern: raw)), p) }
             return (.int(Int32(bitPattern: UInt32(truncatingIfNeeded: raw))), p)
         case 0x17:
             let n = arg + 1
@@ -233,13 +266,14 @@ final class DalvikImage {
             p += n
             return (.ref(DalvikObject.string(string(raw))), p)
         case 0x1C:
-            var (count, next) = uleb(p)
+            let (count, start) = uleb(p)
+            var next = start, values: [DalvikValue] = []
             for _ in 0..<count {
-                let skipped = skipValue(next)
-                next = skipped
+                let (value, end) = encodedValue(next)
+                values.append(value); next = end
             }
-            count = 0
-            return (.ref(nil), next)
+            let array = DalvikObject(className: "[Ljava/lang/Object;"); array.items = values
+            return (.ref(array), next)
         case 0x1E:                      // null
             return (.ref(nil), p)
         case 0x1F:                      // boolean
@@ -257,21 +291,23 @@ final class DalvikImage {
         let type = header & 0x1F
         let arg = header >> 5
         switch type {
-        case 0x00, 0x1E:
+        case 0x1E:
             return p
-        case 0x02, 0x03, 0x04, 0x06, 0x18, 0x17:
+        case 0x00, 0x02, 0x03, 0x04, 0x06, 0x10, 0x11, 0x15...0x1B:
             return p + arg + 1
         case 0x1F:
             return p
         case 0x1C:
-            var (count, next) = uleb(p)
+            let (count, start) = uleb(p)
+            var next = start
             for _ in 0..<count { next = skipValue(next) }
             return next
         case 0x1D:
-            var (count, next) = uleb(p)
+            let (_, afterType) = uleb(p)
+            let (count, start) = uleb(afterType)
+            var next = start
             for _ in 0..<count {
                 next = skipValue(uleb(next).next)
-                next = skipValue(next)
             }
             return next
         default:
@@ -349,6 +385,8 @@ final class DalvikClassInfo {
     var methods: [String: [DalvikMethod]] = [:]
     var staticValues: [String: DalvikValue] = [:]
     var fieldTypes: [String: String] = [:]
+    var jsonNames: [String: String] = [:]
+    var genericSignature = ""
     var initialized = false
     var initializing = false
 

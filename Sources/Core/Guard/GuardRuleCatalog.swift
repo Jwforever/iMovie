@@ -97,10 +97,10 @@ public actor GuardRuleCatalog {
         guard let profile = index.profiles[name] else {
             throw ViewerError.message("插件里没有找到采集器 \(name)。可以在“来源规则”里手动填写网站地址。")
         }
-        guard let rule = GuardRuleBuilder.rule(for: profile) else {
+        guard let rule = GuardRuleBuilder.rule(for: profile, ext: ext) else {
             let hint = profile.strings.isEmpty
                 ? "这个采集器的字符串一条也没解出来。"
-                : "插件里这个采集器只带接口片段（\(profile.strings.count) 条字符串），没有写死网站域名——域名由插件在安卓端运行时才生成。"
+                : "未能从插件确认网页首页及列表规则，提取到的域名也可能是辅助接口。"
             throw ViewerError.message("\(name)：\(hint)可以在“来源规则”里补一个可访问的网站地址，之后按通用网页规则采集。")
         }
         return rule

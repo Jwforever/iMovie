@@ -75,7 +75,7 @@ enum GuardRuleBuilder {
 
     // MARK: - 规则
 
-    static func rule(for profile: GuardSiteProfile) -> GenericSourceRule? {
+    static func rule(for profile: GuardSiteProfile, ext: String? = nil) -> GenericSourceRule? {
         let methods = profile.methods
         let home = methods["homeContent"] ?? []
         let category = methods["categoryContent"] ?? []
@@ -84,7 +84,10 @@ enum GuardRuleBuilder {
         let initial = methods["<init>"] ?? []
 
         let declared = initial + (methods["<clinit>"] ?? []) + (methods["init"] ?? []) + home
-        guard let base = pickHost(declared) ?? pickHost(profile.strings) ?? profile.hosts.first.map({ "https://" + $0 }) else { return nil }
+        // hosts 是引用情报，可能属于封面、网盘、播放器或域名发布页，不能直接作为首页。
+        let lists = (home + category + search).filter(isSelector)
+        guard lists.contains(where: { matches(listHintPattern, $0) }),
+              let base = configuredHost(ext) ?? pickHost(declared) else { return nil }
         var rule = GenericSourceRule(baseURL: base)
         rule.mode = "html"
 
@@ -153,6 +156,16 @@ enum GuardRuleBuilder {
             rule.lineSelector = container
         }
         return rule
+    }
+
+    static func configuredHost(_ ext: String?) -> String? {
+        guard let ext else { return nil }
+        if let data = ext.data(using: .utf8), let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            for key in ["baseURL", "siteUrl", "homeUrl", "host"] {
+                if let value = root[key] as? String, HTTPAddress.optional(value) != nil { return value }
+            }
+        }
+        return HTTPAddress.optional(ext)?.absoluteString
     }
 
     static func pickHost(_ strings: [String]) -> String? {

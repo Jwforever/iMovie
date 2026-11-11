@@ -116,6 +116,12 @@ final class DalvikObject {
         return object
     }
 
+    static func javaClass(_ descriptor: String) -> DalvikObject {
+        let object = DalvikObject(className: "Ljava/lang/Class;")
+        object.fields["descriptor"] = .ref(string(descriptor))
+        return object
+    }
+
     var stringPayload: String? { payload as? String }
 
     var items: [DalvikValue]? {

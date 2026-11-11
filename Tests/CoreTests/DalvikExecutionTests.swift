@@ -229,9 +229,9 @@ private final class CollectorHTTPFixture: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         let html = """
-        <!doctype html><html><body><ul class="nav"><li><a href="/Movie/">电影</a></li></ul>
-        <ul class="threadlist"><li><a class="pic" href="/Movie/test/"><img src="https://poster.test/cover.jpg"></a>
-        <h2><a href="/Movie/test/">解释器执行样片</a></h2><span class="hdtag">HD</span></li></ul></body></html>
+        <!doctype html><html><body><ul class="navbar-nav mr-auto"><li><a href="/Movie/index.html">电影</a></li></ul>
+        <ul class="threadlist"><li><a class="pic" href="/Movie/dzp/test/"><img src="https://poster.test/cover.jpg"></a>
+        <h2><a href="/Movie/dzp/test/" title="解释器执行样片">解释器执行样片</a></h2><span class="hdtag">HD</span></li></ul></body></html>
         """
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "text/html; charset=utf-8"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

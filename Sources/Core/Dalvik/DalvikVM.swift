@@ -44,8 +44,9 @@ final class DalvikVM {
 
     func checkExecution() throws {
         try control.checkCancellation()
-        guard stepCount < maximumSteps else { throw DalvikError.runtime("插件执行超过指令上限。") }
-        guard ProcessInfo.processInfo.systemUptime < deadline else { throw DalvikError.runtime("插件执行超时。") }
+        let location = stackNames.suffix(4).joined(separator: " ← ")
+        guard stepCount < maximumSteps else { throw DalvikError.runtime("插件执行超过指令上限：" + location) }
+        guard ProcessInfo.processInfo.systemUptime < deadline else { throw DalvikError.runtime("插件执行超时：" + location) }
     }
 
     func register(_ className: String, _ name: String,
@@ -75,6 +76,11 @@ final class DalvikVM {
 
     func isSubclass(_ child: String, _ parent: String) -> Bool {
         if child == parent { return true }
+        if parent == "Ljava/lang/Object;", !child.isEmpty { return true }
+        if child.hasSuffix("Exception;") {
+            if parent == "Ljava/lang/Throwable;" || parent == "Ljava/lang/Exception;" { return true }
+            if parent == "Ljava/lang/RuntimeException;", ["NullPointerException;", "NumberFormatException;", "IllegalArgumentException;", "IndexOutOfBoundsException;"].contains(where: child.hasSuffix) { return true }
+        }
         guard var info = classInfo(child) else { return false }
         var seen = Set<String>()
         while !seen.contains(info.name) {
@@ -165,7 +171,7 @@ final class DalvikVM {
         if allowed.contains(where: { method.owner.hasPrefix($0) }) {
             return .ref(nil)
         }
-        throw DalvikError.java("缺少实现 \(method.owner)->\(method.name)")
+        throw DalvikError.java("缺少实现 \(method.owner)->\(method.name)(\(method.params.joined())) ← " + stackNames.suffix(3).joined(separator: " ← "))
     }
 
     func resolve(_ owner: String, _ name: String, _ params: [String], kind: String,
@@ -178,7 +184,7 @@ final class DalvikVM {
         if let found = findMethod(owner, name, params) { return found }
         let allowed = ["Ljava/", "Ljavax/", "Landroid/", "Lokhttp3/", "Lorg/json/",
                        "Lcom/github/catvod/crawler/", "Lkotlin"]
-        if allowed.contains(where: { owner.hasPrefix($0) }) {
+        if allowed.contains(where: { owner.hasPrefix($0) }) || nativeBody(owner, name) != nil {
             return DalvikMethod(owner: owner, name: name, params: params,
                                 ret: "Ljava/lang/Object;", access: 0, codeOffset: 0)
         }
@@ -263,7 +269,7 @@ final class DalvikVM {
                 case 0x1B:
                     registers[a8] = .ref(DalvikObject.string(image.string(s32(1))))
                 case 0x1C:
-                    registers[a8] = .ref(nil)
+                    registers[a8] = .ref(DalvikObject.javaClass(image.typeName(u(1))))
 
                 // ---- 移动 ----
                 case 0x01:

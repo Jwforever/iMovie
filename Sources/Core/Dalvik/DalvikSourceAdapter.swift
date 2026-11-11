@@ -122,6 +122,13 @@ struct DalvikSourceAdapter {
         guard let decoded = CatVodPayload.page(result.json) else {
             throw ViewerError.message("\(site.name)：插件返回的内容不是列表 JSON。")
         }
+        if term.isEmpty, category?.isEmpty != false, decoded.videos.isEmpty, let first = decoded.categories.first {
+            let content = try await DalvikSpider.run(spider: spider, api: site.api,
+                action: .category(id: first.id, page: String(page)), ext: site.extensionValue)
+            if let videos = CatVodPayload.page(content.json) {
+                return VideoPage(categories: decoded.categories, videos: videos.videos, page: videos.page, pageCount: videos.pageCount)
+            }
+        }
         return decoded
     }
 

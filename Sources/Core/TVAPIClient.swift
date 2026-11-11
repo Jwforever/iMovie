@@ -52,8 +52,10 @@ public struct TVAPIClient {
             do { return try await DalvikSourceAdapter(site: site).detail(id: id) }
             catch is CancellationError { throw CancellationError() }
             catch {
+                let pluginError = error
                 do { return try await GenericSourceAdapter(site: site).detail(id: id) }
-                catch { throw error }
+                catch is CancellationError { throw CancellationError() }
+                catch { throw Self.pluginFailure(pluginError, fallback: error) }
             }
         }
         let root = try await object(site: site, query: ["ac": "detail", "ids": id])
@@ -74,8 +76,10 @@ public struct TVAPIClient {
             do { return try await DalvikSourceAdapter(site: site).resolve(episode: episode, flag: flag, title: title) }
             catch is CancellationError { throw CancellationError() }
             catch {
+                let pluginError = error
                 do { return try await GenericSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
-                catch { throw error }
+                catch is CancellationError { throw CancellationError() }
+                catch { throw Self.pluginFailure(pluginError, fallback: error) }
             }
         }
         if HTTPAddress.isMedia(episode.value) {
@@ -145,22 +149,23 @@ public struct TVAPIClient {
     /// 插件源：先让插件自己跑（解释器），失败再退回静态规则。
     private func pluginPage(site: SourceSite, category: String?, search: String?,
                             page: Int) async throws -> VideoPage {
-        if !DalvikSpider.isBlocked(site.api) {
+        do {
+            return try await DalvikSourceAdapter(site: site)
+                .page(category: category, search: search, page: page)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let pluginError = error
+            NSLog("iMovie 插件解释器失败 %@: %@", site.name, error.localizedDescription)
             do {
-                return try await DalvikSourceAdapter(site: site)
+                return try await GenericSourceAdapter(site: site)
                     .page(category: category, search: search, page: page)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                DalvikSpider.block(site.api)
-                NSLog("iMovie 插件解释器失败 %@: %@", site.name, error.localizedDescription)
-                do {
-                    return try await GenericSourceAdapter(site: site)
-                        .page(category: category, search: search, page: page)
-                } catch { throw error }
-            }
+            } catch is CancellationError { throw CancellationError() }
+            catch { throw Self.pluginFailure(pluginError, fallback: error) }
         }
-        return try await GenericSourceAdapter(site: site)
-            .page(category: category, search: search, page: page)
+    }
+
+    private static func pluginFailure(_ plugin: Error, fallback: Error) -> Error {
+        ViewerError.message("插件执行失败：\(plugin.localizedDescription)\n网页兜底失败：\(fallback.localizedDescription)")
     }
 }

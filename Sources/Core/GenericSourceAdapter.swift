@@ -76,7 +76,15 @@ public struct GenericSourceAdapter {
     public func rule() async throws -> GenericSourceRule {
         if let rule = site.genericRule, HTTPAddress.optional(rule.baseURL) != nil { return rule }
         if let ext = site.extensionValue {
-            if let rule = Self.embeddedRule(ext) { return rule }
+            if let rule = Self.embeddedRule(ext) {
+                if site.isPlugin, let extracted = try? await GuardRuleCatalog.shared.rule(api: site.api, ext: ext, spider: SpiderSource.shared.url) {
+                    var base = try JSONSerialization.jsonObject(with: JSONEncoder().encode(extracted)) as? [String: Any] ?? [:]
+                    let overrides = try JSONSerialization.jsonObject(with: JSONEncoder().encode(rule)) as? [String: Any] ?? [:]
+                    overrides.forEach { base[$0.key] = $0.value }
+                    return try JSONDecoder().decode(GenericSourceRule.self, from: JSONSerialization.data(withJSONObject: base))
+                }
+                return rule
+            }
             if let data = Data(base64Encoded: ext), let text = String(data: data, encoding: .utf8),
                let rule = Self.embeddedRule(text) { return rule }
         }
@@ -129,7 +137,7 @@ public struct GenericSourceAdapter {
                     return TVAPIClient.decodePage(root, baseURL: final)
                 }
                 // 规则没有页码占位时，按站点自己的“下一页”链接翻页。
-                if page > 1 && !(explicitTemplate?.contains("{page}") ?? false) {
+                if page > 1 && !(explicitTemplate.map { $0.contains("{page}") || $0.contains("{pg}") } ?? false) {
                     var visited = Set([final.absoluteString])
                     guard page <= 50 else { throw ViewerError.message("通用分页超过 50 页，请设置含 {page} 的地址模板。") }
                     for _ in 1..<page {

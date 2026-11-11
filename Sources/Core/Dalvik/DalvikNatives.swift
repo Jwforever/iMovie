@@ -18,6 +18,8 @@ enum DalvikNatives {
         android(vm)
         aliases(vm)
         javaSupport(vm)
+        reflectionSupport(vm)
+        gsonSupport(vm)
     }
 
     // MARK: - 取值助手
@@ -132,9 +134,9 @@ enum DalvikNatives {
             guard index >= 0, index < value.count else { return .int(0) }
             return .int(Int32(value[index]))
         }
-        vm.register("Ljava/lang/String;", "indexOf") { _, this, args in
+        vm.register("Ljava/lang/String;", "indexOf") { vm, this, args in
             let value = this?.stringPayload ?? ""
-            let needle = string(args.first ?? .ref(nil)) ?? ""
+            let needle = vm.invocationParameters.first == "I" ? String(decoding: [UInt16(truncatingIfNeeded: args.first?.intValue ?? 0)], as: UTF16.self) : string(args.first ?? .ref(nil)) ?? ""
             let start = args.count > 1 ? Int(args[1].intValue) : 0
             guard let range = value.range(of: needle, options: [], range: (value.index(value.startIndex, offsetBy: min(max(0, start), value.count))..<value.endIndex)) else {
                 return .int(-1)
@@ -314,11 +316,15 @@ enum DalvikNatives {
         let wrappers = ["Ljava/lang/Integer;", "Ljava/lang/Long;", "Ljava/lang/Short;",
                         "Ljava/lang/Byte;", "Ljava/lang/Double;", "Ljava/lang/Float;"]
         for className in wrappers {
-            vm.register(className, "parseInt") { _, _, args in .int(parseInt(text(args.first))) }
-            vm.register(className, "parseLong") { _, _, args in .long(Int64(parseInt(text(args.first)))) }
+            vm.register(className, "parseInt") { _, _, args in .int(Int32(truncatingIfNeeded: parseLong(text(args.first), radix: args.count > 1 ? Int(args[1].intValue) : 10))) }
+            vm.register(className, "parseLong") { _, _, args in .long(parseLong(text(args.first), radix: args.count > 1 ? Int(args[1].intValue) : 10)) }
             vm.register(className, "parseDouble") { _, _, args in .double(Double(text(args.first)) ?? 0) }
             vm.register(className, "parseFloat") { _, _, args in .float(Float(text(args.first)) ?? 0) }
             vm.register(className, "valueOf") { _, _, args in args.first ?? .int(0) }
+            vm.register(className, "decode") { _, _, args in .long(parseLong(text(args.first), radix: 0)) }
+            vm.register(className, "toHexString") { _, _, args in
+                .ref(DalvikObject.string(className == "Ljava/lang/Long;" ? String(UInt64(bitPattern: args.first?.longValue ?? 0), radix: 16) : String(UInt32(bitPattern: args.first?.intValue ?? 0), radix: 16)))
+            }
             vm.register(className, "intValue") { _, this, _ in .int(this?.payload as? Int32 ?? 0) }
             vm.register(className, "longValue") { _, this, _ in .long(Int64(this?.payload as? Int32 ?? 0)) }
             vm.register(className, "doubleValue") { _, this, _ in .double(Double(this?.payload as? Int32 ?? 0)) }
@@ -383,6 +389,21 @@ enum DalvikNatives {
         }
         if let integer = Int32(trimmed) { return integer }
         return Int32(Double(trimmed) ?? 0)
+    }
+
+    private static func parseLong(_ value: String, radix: Int) -> Int64 {
+        var text = GuardStringDecoder.arabicDigits(value).trimmingCharacters(in: .whitespacesAndNewlines)
+        let negative = text.hasPrefix("-")
+        if negative || text.hasPrefix("+") { text.removeFirst() }
+        var base = radix
+        if base == 0 {
+            if text.lowercased().hasPrefix("0x") { text = String(text.dropFirst(2)); base = 16 }
+            else if text.hasPrefix("#") { text.removeFirst(); base = 16 }
+            else if text.hasPrefix("0"), text.count > 1 { base = 8 }
+            else { base = 10 }
+        }
+        guard (2...36).contains(base), let number = UInt64(text, radix: base) else { return 0 }
+        return negative ? 0 &- Int64(bitPattern: number) : Int64(bitPattern: number)
     }
 
     // MARK: - 集合

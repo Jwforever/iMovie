@@ -65,7 +65,7 @@ final class DalvikTests: XCTestCase {
             className: "Sample",
             strings: [],
             methods: [
-                "homeContent": ["https://fixture-media.test/"],
+                "homeContent": ["https://fixture-media.test/", "ul.threadlist"],
                 "detailContent": ["div.card-header span b", "ul.episode-list li > a", "h1.detail-title"]
             ],
             hosts: ["https://fixture-media.test"]
@@ -75,5 +75,14 @@ final class DalvikTests: XCTestCase {
         }
         XCTAssertNotEqual(rule.lineSelector, "div.card-header span b",
                           "线路标题不能当成选集容器")
+    }
+
+    func testAuxiliaryHostsAreNotUsedAsWebsiteHome() {
+        let profile = GuardSiteProfile(className: "API", strings: ["https://images.fixture.test/"],
+            methods: ["detailContent": ["https://player.fixture.test/"]], hosts: ["images.fixture.test", "player.fixture.test"])
+        XCTAssertNil(GuardRuleBuilder.rule(for: profile))
+        let web = GuardSiteProfile(className: "HTML", strings: [],
+            methods: ["<init>": ["https://old.fixture.test/"], "homeContent": ["div.module-item"]], hosts: [])
+        XCTAssertEqual(GuardRuleBuilder.rule(for: web, ext: "{\"siteUrl\":\"https://current.fixture.test/\"}")?.baseURL, "https://current.fixture.test/")
     }
 }
