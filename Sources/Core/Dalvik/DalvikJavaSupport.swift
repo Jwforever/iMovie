@@ -40,6 +40,29 @@ extension DalvikNatives {
         vm.register("Ljava/util/UUID;", "randomUUID") { _, _, _ in
             let object = DalvikObject(className: "Ljava/util/UUID;"); object.payload = UUID().uuidString.lowercased(); return .ref(object)
         }
+        vm.register("Ljava/util/UUID;", "<init>") { _, this, args in
+            let upper = UInt64(bitPattern: args.first?.longValue ?? 0), lower = UInt64(bitPattern: args.count > 1 ? args[1].longValue : 0)
+            let raw = String(format: "%016llx%016llx", upper, lower)
+            let chars = Array(raw)
+            this?.payload = [String(chars[0..<8]), String(chars[8..<12]), String(chars[12..<16]), String(chars[16..<20]), String(chars[20..<32])].joined(separator: "-")
+            return .ref(nil)
+        }
+        vm.register("Ljava/util/regex/Matcher;", "groupCount") { _, this, _ in .int(Int32((this?.payload as? MatcherBox)?.regex?.numberOfCaptureGroups ?? 0)) }
+        vm.register("Ljava/lang/Runtime;", "getRuntime") { _, _, _ in .ref(DalvikObject(className: "Ljava/lang/Runtime;")) }
+        vm.register("Ljava/lang/Runtime;", "availableProcessors") { _, _, _ in .int(Int32(ProcessInfo.processInfo.activeProcessorCount)) }
+        for name in ["<init>", "push", "pop", "peek", "empty", "size", "isEmpty"] {
+            vm.register("Ljava/util/Stack;", name) { _, this, args in
+                var values = this?.items ?? []
+                if name == "<init>" { this?.items = []; return .ref(nil) }
+                if name == "push" { values.append(args.first ?? .ref(nil)); this?.items = values; return args.first ?? .ref(nil) }
+                if name == "peek" { return values.last ?? .ref(nil) }
+                if name == "pop" { let value = values.popLast(); this?.items = values; return value ?? .ref(nil) }
+                if name == "size" { return .int(Int32(values.count)) }
+                return .int(values.isEmpty ? 1 : 0)
+            }
+        }
+        if let body = vm.nativeBody("Lorg/json/JSONObject;", "get") { vm.register("Lorg/json/JSONObject;", "opt", body) }
+        if let body = vm.nativeBody("Lorg/json/JSONArray;", "optJSONObject") { vm.register("Lorg/json/JSONArray;", "getJSONObject", body) }
         vm.register("Ljava/util/UUID;", "fromString") { _, _, args in
             let object = DalvikObject(className: "Ljava/util/UUID;"); object.payload = text(args.first).lowercased(); return .ref(object)
         }

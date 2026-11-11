@@ -20,6 +20,7 @@ enum DalvikNatives {
         javaSupport(vm)
         reflectionSupport(vm)
         gsonSupport(vm)
+        cryptoSupport(vm)
     }
 
     // MARK: - 取值助手
@@ -29,6 +30,7 @@ enum DalvikNatives {
         switch value {
         case .ref(let object):
             guard let object else { return "null" }
+            if let value = object.payload as? DalvikValue { return text(value) }
             if let string = object.stringPayload { return string }
             if let items = object.items { return items.map { text($0) }.joined(separator: ",") }
             return "<\(object.className)>"
@@ -195,14 +197,33 @@ enum DalvikNatives {
         vm.register("Ljava/lang/String;", "split") { _, this, args in
             let value = this?.stringPayload ?? ""
             let pattern = string(args.first ?? .ref(nil)) ?? ""
-            var parts = value.components(separatedBy: pattern)
-            if args.count > 1 {
-                let limit = Int(args[1].intValue)
-                if limit > 0, parts.count > limit { parts = Array(parts.prefix(limit)) }
-            }
+            let limit = args.count > 1 ? Int(args[1].intValue) : 0
+            var parts: [String] = []
+            if let regex = try? NSRegularExpression(pattern: pattern), !value.isEmpty {
+                let subject = value as NSString
+                var start = 0
+                for match in regex.matches(in: value, range: NSRange(location: 0, length: subject.length)) {
+                    if match.range.length == 0 && match.range.location == 0 { continue }
+                    if limit > 0 && parts.count >= limit - 1 { break }
+                    parts.append(subject.substring(with: NSRange(location: start, length: match.range.location - start)))
+                    start = match.range.location + match.range.length
+                }
+                parts.append(subject.substring(from: start))
+                if limit == 0 { while parts.last == "" { parts.removeLast() } }
+            } else { parts = [value] }
             let object = DalvikObject(className: "[Ljava/lang/String;")
             object.items = parts.map { DalvikValue.ref(DalvikObject.string($0)) }
             return .ref(object)
+        }
+        vm.register("Ljava/lang/String;", "regionMatches") { _, this, args in
+            let ignoreCase = args.count == 5
+            let offset = ignoreCase ? 1 : 0
+            guard args.count >= offset + 4 else { return .int(0) }
+            let left = Array((this?.stringPayload ?? "").utf16), right = Array(text(args[offset + 1]).utf16)
+            let start = Int(args[offset].intValue), other = Int(args[offset + 2].intValue), count = Int(args[offset + 3].intValue)
+            guard start >= 0, other >= 0, count >= 0, start + count <= left.count, other + count <= right.count else { return .int(0) }
+            let a = String(decoding: left[start..<(start + count)], as: UTF16.self), b = String(decoding: right[other..<(other + count)], as: UTF16.self)
+            return .int(ignoreCase && args[0].intValue != 0 ? (a.lowercased() == b.lowercased() ? 1 : 0) : (a == b ? 1 : 0))
         }
         vm.register("Ljava/lang/String;", "matches") { _, this, args in
             let value = this?.stringPayload ?? ""
@@ -320,15 +341,24 @@ enum DalvikNatives {
             vm.register(className, "parseLong") { _, _, args in .long(parseLong(text(args.first), radix: args.count > 1 ? Int(args[1].intValue) : 10)) }
             vm.register(className, "parseDouble") { _, _, args in .double(Double(text(args.first)) ?? 0) }
             vm.register(className, "parseFloat") { _, _, args in .float(Float(text(args.first)) ?? 0) }
-            vm.register(className, "valueOf") { _, _, args in args.first ?? .int(0) }
+            vm.register(className, "valueOf") { _, _, args in
+                let value: DalvikValue
+                if args.first?.asObject?.stringPayload != nil {
+                    let raw = text(args.first)
+                    if className == "Ljava/lang/Double;" { value = .double(Double(raw) ?? 0) }
+                    else if className == "Ljava/lang/Float;" { value = .float(Float(raw) ?? 0) }
+                    else { value = .long(parseLong(raw, radix: args.count > 1 ? Int(args[1].intValue) : 10)) }
+                } else { value = args.first ?? .int(0) }
+                let object = DalvikObject(className: className); object.payload = value; return .ref(object)
+            }
             vm.register(className, "decode") { _, _, args in .long(parseLong(text(args.first), radix: 0)) }
             vm.register(className, "toHexString") { _, _, args in
                 .ref(DalvikObject.string(className == "Ljava/lang/Long;" ? String(UInt64(bitPattern: args.first?.longValue ?? 0), radix: 16) : String(UInt32(bitPattern: args.first?.intValue ?? 0), radix: 16)))
             }
-            vm.register(className, "intValue") { _, this, _ in .int(this?.payload as? Int32 ?? 0) }
-            vm.register(className, "longValue") { _, this, _ in .long(Int64(this?.payload as? Int32 ?? 0)) }
-            vm.register(className, "doubleValue") { _, this, _ in .double(Double(this?.payload as? Int32 ?? 0)) }
-            vm.register(className, "toString") { _, _, args in .ref(DalvikObject.string(text(args.first))) }
+            vm.register(className, "intValue") { _, this, _ in .int((this?.payload as? DalvikValue)?.intValue ?? 0) }
+            vm.register(className, "longValue") { _, this, _ in .long((this?.payload as? DalvikValue)?.longValue ?? 0) }
+            vm.register(className, "doubleValue") { _, this, _ in .double((this?.payload as? DalvikValue)?.doubleValue ?? 0) }
+            vm.register(className, "toString") { _, this, args in .ref(DalvikObject.string(text(args.first ?? this.map { .ref($0) }))) }
             vm.register(className, "compare") { _, _, args in
                 let left = args.first?.doubleValue ?? 0
                 let right = args.count > 1 ? args[1].doubleValue : 0
@@ -422,6 +452,12 @@ enum DalvikNatives {
                 else { items.append(args.first ?? .ref(nil)) }
                 store(this, items)
                 return .int(1)
+            }
+            vm.register(className, "addAll") { _, this, args in
+                var items = list(this)
+                let values = args.last?.asObject?.items ?? []
+                let offset = args.count > 1 ? min(max(0, Int(args[0].intValue)), items.count) : items.count
+                items.insert(contentsOf: values, at: offset); store(this, items); return .int(values.isEmpty ? 0 : 1)
             }
             vm.register(className, "get") { _, this, args in
                 let items = list(this)

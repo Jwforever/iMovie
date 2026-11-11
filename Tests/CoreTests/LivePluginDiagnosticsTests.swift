@@ -60,8 +60,38 @@ final class LivePluginDiagnosticsTests: XCTestCase {
                                     if let video = CatVodPayload.detail(detail.json) {
                                         report["detailTitle"] = video.title
                                         report["episodeCount"] = video.lines.reduce(0) { $0 + $1.episodes.count }
+                                        if ["Auete", "Dm84", "Bttwoo", "Nmyswv"].contains(name), let line = video.lines.first, let episode = line.episodes.first {
+                                            do {
+                                                let output = try await Task.detached {
+                                                    try DalvikSpider.execute(dex: dex, shortName: name, action: .player(flag: line.name, id: episode.value), ext: site.extensionValue ?? "", maximumSteps: 4_000_000, timeout: 12)
+                                                }.value
+                                                report["playerOutput"] = String(output.json.prefix(800))
+                                                if let result = CatVodPayload.playback(output.json) {
+                                                    report["playerURL"] = result.url
+                                                    var media = MediaLink(title: video.title, url: result.url, headers: result.headers, kind: result.needsParsing ? .web : .direct)
+                                                    media = try await MediaResolver().resolve(media)
+                                                    report["resolvedMedia"] = media.url
+                                                    var request = URLRequest(url: try HTTPAddress.parse(media.url), timeoutInterval: 10)
+                                                    media.headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+                                                    request.setValue("bytes=0-1023", forHTTPHeaderField: "Range")
+                                                    let (data, response) = try await URLSession.shared.data(for: request)
+                                                    report["mediaStatus"] = (response as? HTTPURLResponse)?.statusCode ?? 0
+                                                    report["mediaBytes"] = data.count
+                                                    report["mediaPrefix"] = String(decoding: data.prefix(80), as: UTF8.self)
+                                                }
+                                            } catch { report["playerError"] = error.localizedDescription }
+                                        }
                                     }
                                 } catch { report["detailError"] = error.localizedDescription }
+                                if ["Auete", "Dm84", "Bttwoo", "Nmyswv"].contains(name) {
+                                    do {
+                                        let search = try await Task.detached {
+                                            try DalvikSpider.execute(dex: dex, shortName: name, action: .search(keyword: "月"), ext: site.extensionValue ?? "", maximumSteps: 4_000_000, timeout: 12)
+                                        }.value
+                                        report["searchVideos"] = CatVodPayload.page(search.json)?.videos.count ?? 0
+                                        report["searchRequests"] = search.requests.map { ["url": $0.url, "status": $0.code] as [String: Any] }
+                                    } catch { report["searchError"] = error.localizedDescription }
+                                }
                             }
                         } catch { report["interpreterError"] = error.localizedDescription }
                         return report

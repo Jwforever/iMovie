@@ -208,6 +208,10 @@ final class DalvikExecutionTests: XCTestCase {
         XCTAssertTrue(page.videos.contains { $0.title == "解释器执行样片" }, result.json)
         XCTAssertFalse(result.requests.isEmpty, "必须通过插件的 HTTP 垫片读取 HTML")
         XCTAssertGreaterThan(result.steps, 100)
+        let detail = try DalvikSpider.execute(dex: dex, shortName: "Auete", action: .detail(id: "Movie/dzp/test"), ext: "", httpSession: session)
+        let video = try XCTUnwrap(CatVodPayload.detail(detail.json), detail.json)
+        XCTAssertEqual(video.title, "解释器执行样片")
+        XCTAssertEqual(video.lines.first?.episodes.first?.title, "第 1 集", detail.json)
     }
 
     func testObjectHashCodeDispatchesToJavaStringForObfuscatedSwitch() throws {
@@ -241,6 +245,9 @@ private final class CollectorHTTPFixture: URLProtocol {
         <!doctype html><html><body><ul class="navbar-nav mr-auto"><li><a href="/Movie/index.html">电影</a></li></ul>
         <ul class="threadlist"><li><a class="pic" href="/Movie/dzp/test/"><img src="https://poster.test/cover.jpg"></a>
         <h2><a href="/Movie/dzp/test/" title="解释器执行样片">解释器执行样片</a></h2><span class="hdtag">HD</span></li></ul></body></html>
+        <div class="detail-main-card"><h1 class="detail-title">解释器执行样片</h1></div>
+        <div class="play-card" id="player_list"><div class="card-header"><span><b>云播B线</b></span></div>
+        <ul class="episode-list"><li><a href="/Movie/dzp/test/play-1-1.html">第 1 集</a></li></ul></div>
         """
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "text/html; charset=utf-8"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

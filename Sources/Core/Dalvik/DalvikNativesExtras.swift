@@ -153,7 +153,8 @@ extension DalvikNatives {
                 return .int(number.boolValue ? 1 : 0)
             }
             if number.doubleValue == number.doubleValue.rounded(), abs(number.doubleValue) < 9e15 {
-                return .int(Int32(truncatingIfNeeded: number.int64Value))
+                if number.int64Value >= Int64(Int32.min), number.int64Value <= Int64(Int32.max) { return .int(number.int32Value) }
+                return .long(number.int64Value)
             }
             return .double(number.doubleValue)
         case let dictionary as [String: Any]:
@@ -179,6 +180,7 @@ extension DalvikNatives {
         case .double(let v): return v
         case .ref(let object):
             guard let object else { return NSNull() }
+            if let value = object.payload as? DalvikValue { return plain(value) }
             if let string = object.stringPayload { return string }
             if let values = object.payload as? [String: DalvikValue] {
                 var output: [String: Any] = [:]
@@ -392,9 +394,10 @@ extension DalvikNatives {
     /// 同步 HTTP。插件代码本身就是同步调用，这里用信号量等结果。
     static func perform(_ vm: DalvikVM, _ request: RequestBox?) throws -> HTTPResult {
         try vm.checkExecution()
-        guard let request, let url = URL(string: request.url) else {
-            vm.log("(无效地址)", 0)
-            return HTTPResult(code: 0, body: Data(), headers: [:])
+        guard let request, let url = URL(string: request.url), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else {
+            let address = request?.url ?? "(null)"
+            vm.log(address, 0)
+            throw DalvikError.runtime("插件生成的请求地址无效：" + String(address.prefix(200)))
         }
         var mutable = URLRequest(url: url, timeoutInterval: 25)
         mutable.httpMethod = request.method
@@ -475,6 +478,10 @@ extension DalvikNatives {
         }
         vm.register("Landroid/text/TextUtils;", "isEmpty") { _, _, args in
             .int(args.first?.isZero != false || text(args.first).isEmpty ? 1 : 0)
+        }
+        vm.register("Landroid/text/TextUtils;", "join") { _, _, args in
+            let values = args.count > 1 ? args[1].asObject?.items ?? (args[1].asObject?.payload as? IteratorBox)?.items ?? [] : []
+            return .ref(DalvikObject.string(values.map(text).joined(separator: text(args.first))))
         }
         vm.register("Lcom/github/catvod/crawler/SpiderDebug;", "log") { _, _, _ in .ref(nil) }
         vm.register("Lcom/github/catvod/crawler/Spider;", "<init>") { _, _, _ in .ref(nil) }

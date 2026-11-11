@@ -50,7 +50,7 @@ enum DalvikValue {
         case .long(let v): return Int32(truncatingIfNeeded: v)
         case .float(let v): return Int32(v)
         case .double(let v): return Int32(v)
-        case .ref: return 0
+        case .ref(let object): return (object?.payload as? DalvikValue)?.intValue ?? 0
         }
     }
 
@@ -60,7 +60,7 @@ enum DalvikValue {
         case .long(let v): return v
         case .float(let v): return Int64(v)
         case .double(let v): return Int64(v)
-        case .ref: return 0
+        case .ref(let object): return (object?.payload as? DalvikValue)?.longValue ?? 0
         }
     }
 
@@ -70,7 +70,7 @@ enum DalvikValue {
         case .long(let v): return Double(v)
         case .float(let v): return Double(v)
         case .double(let v): return v
-        case .ref: return 0
+        case .ref(let object): return (object?.payload as? DalvikValue)?.doubleValue ?? 0
         }
     }
 

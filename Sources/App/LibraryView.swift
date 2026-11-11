@@ -56,7 +56,6 @@ import SwiftUI
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var filter = ""
-    @State private var probing = false
 
     /// 只用导入配置时定下的固定顺序；探测结果不会在浏览过程中改变这里。
     private var sites: [SourceSite] {
@@ -81,26 +80,6 @@ import SwiftUI
             .navigationTitle("选择点播源").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
         }
-    }
-
-    /// 首次打开时把还没试过的来源各拉一次首屏，结果写进 health，
-    /// 列表随即按"能用的在前"自己重排。
-    private func probeUntested() async {
-        guard !probing else { return }
-        probing = true
-        defer { probing = false }
-        let targets = (store.config?.sites ?? []).filter { $0.isNative && store.health[$0.key] == nil }
-        var index = 0
-        while index < targets.count {
-            if Task.isCancelled { break }
-            let slice = Array(targets[index..<min(index + 4, targets.count)])
-            await withTaskGroup(of: Void.self) { group in
-                for site in slice { group.addTask { await store.probe(site) } }
-            }
-            index += 4
-        }
-        // 全部测完只重排一次，避免列表在用户眼前跳动。
-        if !Task.isCancelled { store.rebuildSourceOrder() }
     }
 
     private func sourceRow(_ site: SourceSite) -> some View {
