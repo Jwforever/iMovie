@@ -7,10 +7,11 @@
 - 25 项 Swift 核心测试通过，包括来源识别、重复分类搜索合并、奥特当前 HTML 列表 / 详情与安全的公开 HLS 提取。
 - 8 项 Python 工具测试与 1 项浏览器媒体识别测试通过。
 - iPhoneOS arm64 Release 编译及未签名 IPA 打包通过。
-- 模拟器最终结果与构建提交在交付时写入 `dist/build-info.json`。
+- 最终模拟器 5 项测试全部通过，0 失败、0 跳过。覆盖首页切源 / 分类 / 重启保留 / 聚合搜索、本地播放 / 收藏 / 最近播放、网页转系统播放、真实配置的动漫巴士与奥特播放。
+- 最终构建：[GitHub Actions 42954727744](https://github.com/Jwforever/iMovie/actions/runs/42954727744)，应用代码提交 `bd37dca7d5bc8d7f7c1e0c4ce5442abcd80964f2`。交付包内文档补入本次结果，应用代码与该构建一致；详细版本与 SHA256 见 `dist/build-info.json`。
 - 奥特当前首页 → 「折月亮」详情选集 → 本机读取公开 HLS → AVPlayer 进入 `playing`，已在 iPhone 16 / iOS 18.5 模拟器完成；搜索验证页面及应用内验证入口也已实际打开。测试没有代填验证码，验证后搜索是否受站点进一步限制仍取决于实际网络与网站状态。
 - 奥特搜索在 macOS HTTP 探测中返回网站自己的验证码页。应用提供用户在 WebKit 中完成验证并将相关站点 Cookie 共享给本机请求的入口；自动化测试不代填或绕过验证码。
-- 动漫巴士在本轮云端回归中连续两次搜索报「无法连接服务器」。应用对连接中断、无法连接主机、DNS 与超时增加一次有限重试；模拟器测试仅在明确出现连接故障时记录为跳过，并保存截图，解析或播放断言失败仍判为失败。旧版完整播放的证据保留在下方，不能据此宣称本轮该来源已通过。
+- 动漫巴士在最终构建中完成真实配置 → 搜索「神厨狂后」→ 第 12 集 → WebKit 识别 HLS → AVPlayer 进入 `playing`。本轮此前连续两次云端搜索报「无法连接服务器」；应用已对连接中断、无法连接主机、DNS 与超时增加一次有限重试。最终恢复不能证明站点以后一直可用，也不能单凭这次成功确定是重试还是网络恢复起效。测试仅在明确连接故障时才会记录跳过，最终构建未触发该分支。
 - 立播和厂长部分当前域名返回 HTTP 403；没有将这些来源记录为已验证可用。B站和兔小贝维持原有适配及已有网络验证范围。
 
 ## 0.2.0 历史验证
@@ -52,6 +53,6 @@
 
 2026-11-10 最终通过的完整 macOS 构建记录：[GitHub Actions 42803822395](https://github.com/Jwforever/iMovie/actions/runs/42803822395)，对应提交 `5aefc6fe66c9572e315f2ee3fbdc2e6d4e00f685`。这是私有仓库，需使用仓库所有者账号查看。最终交付构建信息见 `dist/build-info.json`。
 
-本地 `dist/screenshots/` 保存从 Xcode xcresult 导出的截图。其中 `11-dm84-system-playing.png` 可见真实来源的解码画面，`07-user-config-imported.png` 显示配置与来源数量。测试使用的演示片库和生成视频仅在测试环境运行，不打包进 IPA。
+本地 `dist/screenshots/0.3.0/` 保存最终构建从 Xcode xcresult 导出的截图。`11-dm84-system-playing.png` 与 `18-auete-system-playing.png` 为两个真实来源的播放画面，`15-auete-home.png` 为实际网站首页内容，`12-home-with-recent.png` 为最近播放，`20-global-search-results.png` 为本地两站点聚合搜索测试；`07-user-config-imported.png` 显示配置与来源数量。测试使用的演示片库和生成视频仅在测试环境运行，不打包进 IPA。
 
 Windows 的 Edge 手机模式另验证同一动漫巴士页面约 19 秒连续播放、readyState 4，作为浏览器侧补充证据；iOS 结论以模拟器测试为依据。
