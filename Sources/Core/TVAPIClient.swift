@@ -38,7 +38,7 @@ public struct TVAPIClient {
     }
 
     private func loadPage(site: SourceSite, category: String?, search: String?, page: Int) async throws -> VideoPage {
-        if site.isPlugin { return try await GenericSourceAdapter(site: site).page(category: category, search: search, page: page) }
+        if site.isPlugin { return try await pluginPage(site: site, category: category, search: search, page: page) }
         var values = ["pg": String(page)]
         if let category, !category.isEmpty { values["t"] = category; values["ac"] = "detail" }
         if let search, !search.isEmpty { values["wd"] = search; values["ac"] = "detail" }
@@ -47,7 +47,15 @@ public struct TVAPIClient {
     }
 
     public func detail(site: SourceSite, id: String) async throws -> Video {
-        if site.isPlugin { return try await GenericSourceAdapter(site: site).detail(id: id) }
+        if site.isPlugin {
+            // 插件自己解析（和 OK影视 同一份逻辑），规则只是兜底。
+            do { return try await DalvikSourceAdapter(site: site).detail(id: id) }
+            catch is CancellationError { throw CancellationError() }
+            catch {
+                do { return try await GenericSourceAdapter(site: site).detail(id: id) }
+                catch { throw error }
+            }
+        }
         let root = try await object(site: site, query: ["ac": "detail", "ids": id])
         let page = Self.decodePage(root, baseURL: try HTTPAddress.parse(site.api))
         guard let video = page.videos.first else { throw ViewerError.message("接口没有返回影片详情。") }
@@ -62,7 +70,14 @@ public struct TVAPIClient {
     }
 
     private func resolveLink(site: SourceSite, episode: Episode, flag: String, title: String) async throws -> MediaLink {
-        if site.isPlugin { return try await GenericSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
+        if site.isPlugin {
+            do { return try await DalvikSourceAdapter(site: site).resolve(episode: episode, flag: flag, title: title) }
+            catch is CancellationError { throw CancellationError() }
+            catch {
+                do { return try await GenericSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
+                catch { throw error }
+            }
+        }
         if HTTPAddress.isMedia(episode.value) {
             return MediaLink(title: title, url: episode.value, group: site.name)
         }
@@ -125,5 +140,27 @@ public struct TVAPIClient {
             .replacingOccurrences(of: "&nbsp;", with: " ").replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&quot;", with: "\"").replacingOccurrences(of: "&#39;", with: "'")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// 插件源：先让插件自己跑（解释器），失败再退回静态规则。
+    private func pluginPage(site: SourceSite, category: String?, search: String?,
+                            page: Int) async throws -> VideoPage {
+        if !DalvikSpider.isBlocked(site.api) {
+            do {
+                return try await DalvikSourceAdapter(site: site)
+                    .page(category: category, search: search, page: page)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                DalvikSpider.block(site.api)
+                NSLog("iMovie 插件解释器失败 %@: %@", site.name, error.localizedDescription)
+                do {
+                    return try await GenericSourceAdapter(site: site)
+                        .page(category: category, search: search, page: page)
+                } catch { throw error }
+            }
+        }
+        return try await GenericSourceAdapter(site: site)
+            .page(category: category, search: search, page: page)
     }
 }

@@ -9,6 +9,7 @@ enum DalvikSpiderAction {
     case category(id: String, page: String)
     case detail(id: String)
     case search(keyword: String)
+    case player(flag: String, id: String)
 
     var methodName: String {
         switch self {
@@ -16,6 +17,7 @@ enum DalvikSpiderAction {
         case .category: return "categoryContent"
         case .detail: return "detailContent"
         case .search: return "searchContent"
+        case .player: return "playerContent"
         }
     }
 }
@@ -35,6 +37,23 @@ struct DalvikRunResult {
 }
 
 enum DalvikSpider {
+    private static let lock = NSLock()
+    private static var blockedUntil: [String: Date] = [:]
+
+    /// 刚失败过的采集器，短时间内不再重试，避免每次翻页都白等一遍。
+    static func isBlocked(_ api: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let until = blockedUntil[api] else { return false }
+        if until > Date() { return true }
+        blockedUntil.removeValue(forKey: api)
+        return false
+    }
+
+    static func block(_ api: String) {
+        lock.lock(); defer { lock.unlock() }
+        blockedUntil[api] = Date().addingTimeInterval(600)
+    }
+
     /// 插件 dex 的本地缓存（与规则解析共用同一个 jar 地址）。
     static func dex(spider: String?) async throws -> Data {
         guard let address = GuardRuleCatalog.jarURL(from: spider) else {
@@ -119,6 +138,17 @@ enum DalvikSpider {
             let list = DalvikObject(className: "Ljava/util/ArrayList;")
             list.items = [.ref(DalvikObject.string(id))]
             result = try vm.invoke(method, [.ref(list)], spider)
+        case .player(let flag, let id):
+            guard let method = vm.findMethod(className, "playerContent",
+                                             ["Ljava/lang/String;", "Ljava/lang/String;",
+                                              "Ljava/util/List;"]) else {
+                throw ViewerError.message("\(shortName) 没有 playerContent。")
+            }
+            let list = DalvikObject(className: "Ljava/util/ArrayList;")
+            list.items = []
+            result = try vm.invoke(method, [.ref(DalvikObject.string(flag)),
+                                            .ref(DalvikObject.string(id)),
+                                            .ref(list)], spider)
         case .search(let keyword):
             guard let method = vm.findMethod(className, "searchContent",
                                              ["Ljava/lang/String;", "Z"]) else {
