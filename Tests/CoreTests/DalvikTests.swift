@@ -65,6 +65,7 @@ final class DalvikTests: XCTestCase {
             className: "Sample",
             strings: [],
             methods: [
+                "homeContent": ["https://www.example.com/"],
                 "detailContent": ["div.card-header span b", "ul.episode-list li > a", "h1.detail-title"]
             ],
             hosts: ["https://www.example.com"]
