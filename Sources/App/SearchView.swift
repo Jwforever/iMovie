@@ -25,6 +25,7 @@ private struct SearchHit: Identifiable {
     @State private var requestID = UUID()
     @State private var selectedSource: String?
     @State private var verifyingSource = false
+    @State private var verifyURL: URL?
     @State private var verificationTarget: SourceSearchTarget?
     @State private var showingSources = false
 
@@ -67,7 +68,7 @@ private struct SearchHit: Identifiable {
         .sheet(isPresented: $verifyingSource, onDismiss: {
             if let target = verificationTarget { retry(target) }
         }) {
-            if let url = try? AueteAdapter.pageURL(category: nil, search: submitted, page: 1) { SourceVerificationView(url: url) }
+            if let verifyURL { SourceVerificationView(url: verifyURL) }
         }
     }
 
@@ -143,11 +144,9 @@ private struct SearchHit: Identifiable {
                             Text(result.error ?? "").font(.caption).foregroundStyle(.secondary)
                             HStack {
                                 Button("重试") { retry(result.target) }
-                                if result.site.usesGenericAdapter {
+                                if result.site.isPlugin {
                                     NavigationLink("来源规则") { SourceRuleEditor(site: result.site) }
-                                }
-                                if result.site.nativeAdapter == .auete {
-                                    Button("网页验证") { verificationTarget = result.target; verifyingSource = true }
+                                    Button("网页验证") { openVerification(result.target) }
                                 }
                             }.font(.caption)
                         }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
@@ -212,6 +211,19 @@ private struct SearchHit: Identifiable {
             let result = await Self.fetch(target, term: term)
             guard requestID == token, !Task.isCancelled else { return }
             if let index = results.firstIndex(where: { $0.id == result.id }) { results[index] = result }
+        }
+    }
+
+    private func openVerification(_ target: SourceSearchTarget) {
+        Task {
+            if let rule = try? await GenericSourceAdapter(site: target.site).rule(),
+               let url = HTTPAddress.optional(rule.baseURL) {
+                verificationTarget = target
+                verifyURL = url
+                verifyingSource = true
+            } else {
+                store.error = "还没有解出这个来源的网站地址。"
+            }
         }
     }
 }

@@ -23,7 +23,7 @@ public struct DoubanRecommendations {
             for collection in ["movie_top250", "tv_hot", "movie_showing"] {
                 group.addTask {
                     let url = URL(string: "https://m.douban.com/rexxar/api/v2/subject_collection/\(collection)/items?start=0&count=30")!
-                    guard let (data, _) = try? await HTTPClient().data(from: url, headers: ["Referer": "https://m.douban.com/", "User-Agent": HTMLSourceAdapter.userAgent], cacheLifetime: 6 * 60 * 60) else { return [] }
+                    guard let (data, _) = try? await HTTPClient().data(from: url, headers: ["Referer": "https://m.douban.com/", "User-Agent": BrowserProfile.userAgent], cacheLifetime: 6 * 60 * 60) else { return [] }
                     return (try? Self.decode(data)) ?? []
                 }
             }

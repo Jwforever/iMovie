@@ -25,14 +25,13 @@ import SwiftUI
             if let config = store.config {
                 Section("兼容情况") {
                     LabeledContent("点播来源", value: "\(config.sites.count)")
-                    LabeledContent("本机 JSON 接口", value: "\(config.sites.filter { $0.runtime == .jsonAPI }.count)")
-                    LabeledContent("本机移植（实验）", value: "\(config.sites.filter { $0.runtime == .nativePort }.count)")
-                    LabeledContent("通用规则尝试", value: "\(config.sites.filter(\.usesGenericAdapter).count)")
-                    LabeledContent("待适配脚本", value: "\(config.sites.filter { $0.runtime == .javascript }.count)")
+                    LabeledContent("插件解析", value: "\(config.sites.filter { $0.isPlugin }.count)")
+                    LabeledContent("JSON 接口", value: "\(config.sites.filter { $0.runtime == .jsonAPI }.count)")
+                    LabeledContent("脚本源（未支持）", value: "\(config.sites.filter { $0.runtime == .javascript }.count)")
                     LabeledContent("直播列表", value: "\(config.lives.count)")
                     LabeledContent("更新于", value: config.importedAt.formatted(date: .abbreviated, time: .shortened))
                     NavigationLink("来源地址 / 通用规则") { SourceRulesView() }.accessibilityIdentifier("settings-source-rules")
-                    Text("所有 Android 来源开放通用尝试，不以验证状态隐藏；可补充地址 / 规则，报错显示实际原因。专用适配与通用试配不代表全部 Android 插件已兼容。")
+                    Text("插件源不执行安卓代码：应用在设备内解开配置指定的 spider 包，从插件里读出站点域名与选择器，再按网页规则采集。域名变化只需重新导入配置，不用重装 App。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

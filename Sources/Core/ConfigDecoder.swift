@@ -42,7 +42,7 @@ public enum ConfigDecoder {
             } else { extensionValue = nil }
             return SourceSite(
                 key: key, name: JSONValue.text(item["name"]).isEmpty ? key : JSONValue.text(item["name"]),
-                type: JSONValue.integer(item["type"], default: -1), api: resolved,
+                api: resolved,
                 searchable: JSONValue.flag(item["searchable"], default: true), extensionValue: extensionValue,
                 genericRule: GenericSourceAdapter.embeddedRule(item["ios"] ?? item["iMovie"])
             )

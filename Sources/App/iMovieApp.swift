@@ -80,12 +80,13 @@ enum Theme {
 
 @MainActor struct RuntimeLabel: View {
     var runtime: SourceRuntime
+    private var highlighted: Bool { runtime == .plugin || runtime == .jsonAPI }
     var body: some View {
         Text(runtime.title)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 8).padding(.vertical, 5)
-            .foregroundStyle(runtime == .jsonAPI || runtime == .nativePort ? Theme.accent : Color.secondary)
-            .background((runtime == .jsonAPI || runtime == .nativePort ? Theme.accent : Color.secondary).opacity(0.12), in: Capsule())
+            .foregroundStyle(highlighted ? Theme.accent : Color.secondary)
+            .background((highlighted ? Theme.accent : Color.secondary).opacity(0.12), in: Capsule())
     }
 }
 

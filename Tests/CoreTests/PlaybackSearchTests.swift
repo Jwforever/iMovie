@@ -53,15 +53,6 @@ final class PlaybackSearchTests: XCTestCase {
         XCTAssertEqual(try DoubanRecommendations.decode(data).map(\.poster), ["https://img.example.test/one.jpg", "https://img.example.test/two.jpg", "https://img.example.test/three.jpg"])
     }
 
-    func testFirstAidCatalogSearchAndPublicEpisode() throws {
-        let html = #"<div class="jj-title-li"><div class="list-br3"><a href="/jijiu/article/sample.html">人工呼吸</a><a href="https://ad.example.test/jijiu/article/sample.html">广告</a></div></div>"#
-        let page = try FirstAidAdapter.decodePage(Data(html.utf8), category: "0", search: "呼吸")
-        XCTAssertEqual(page.videos.map(\.title), ["人工呼吸"])
-        let detail = try FirstAidAdapter.decodeDetail(Data(#"<h1 class="video-title h1-title">人工呼吸法</h1><div class="img-text-con">教学</div><video id="video"><source src="https://vod.youlai.cn/sample.mp4"></video>"#.utf8), id: "/jijiu/article/sample.html")
-        XCTAssertEqual(detail.lines.first?.episodes.first?.value, "https://vod.youlai.cn/sample.mp4")
-        XCTAssertEqual(SourceSite(key: "Aid", name: "急救", type: 3, api: "csp_FirstAidGuard", searchable: true).nativeAdapter, .firstAid)
-    }
-
     func testCatalogCachePersistsAndClearingForcesReload() async throws {
         actor Counter {
             var count = 0

@@ -8,3 +8,7 @@ xcuserdata/
 __pycache__/
 .swiftpm/
 node_modules/
+relay-desktop/bin/
+*.exe
+tools/dexrules/inner-plaintext.dex
+tools/dexrules/*.dex

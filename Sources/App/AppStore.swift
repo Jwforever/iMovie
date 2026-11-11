@@ -32,7 +32,6 @@ final class AppStore: ObservableObject {
     var homeSource: SourceSite? {
         guard let config else { return nil }
         return config.sites.first { $0.key == homeSourceKey }
-            ?? config.nativeSites.first { $0.nativeAdapter == .dm84 }
             ?? config.nativeSites.first
             ?? config.sites.first
     }
@@ -60,6 +59,7 @@ final class AppStore: ObservableObject {
         favorites = Self.load([MediaLink].self, key: "favorites", defaults: storage) ?? []
         history = Self.load([WatchRecord].self, key: "history", defaults: storage) ?? []
         sourceRules = Self.load([String: GenericSourceRule].self, key: "sourceRules", defaults: storage) ?? [:]
+        SpiderSource.shared.update(config?.spider)
     }
 
     func importConfig() async {
@@ -75,6 +75,9 @@ final class AppStore: ObservableObject {
             config = result
             persist(result, key: "config")
             defaults.set(configURL, forKey: "configURL")
+            SpiderSource.shared.update(result.spider)
+            // 插件解析在后台预热：首屏按需触发，失败只影响单个来源。
+            Task.detached { await GuardRuleCatalog.shared.prepare(spider: result.spider) }
         } catch is CancellationError { }
         catch { self.error = error.localizedDescription }
     }

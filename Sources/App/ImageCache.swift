@@ -54,7 +54,7 @@ actor ImageCache {
         let token = generation
         let task = Task<Data, Error> {
             var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 25)
-            request.setValue(HTMLSourceAdapter.userAgent, forHTTPHeaderField: "User-Agent")
+            request.setValue(BrowserProfile.userAgent, forHTTPHeaderField: "User-Agent")
             if let host = url.host { request.setValue("\(url.scheme ?? "https")://\(host)/", forHTTPHeaderField: "Referer") }
             let host = url.host?.lowercased() ?? ""
             if host == "doubanio.com" || host.hasSuffix(".doubanio.com") {

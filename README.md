@@ -1,121 +1,107 @@
-# iMovie 0.4.0 · iOS 私人播放器
+# iMovie 0.5.0 · iOS 私人播放器
 
-0.4.0 修复整张海报的点击范围，选集后在详情页顶部直接播放，不展示原播放网页；隐藏系统倍速入口，并保留同一 AVPlayer 会话处理横竖屏变化。首页改为豆瓣高分轮播，全局搜索改为左侧来源筛选、右侧匹配度排序；新增图片、片库和推荐缓存，以及「关于 iMovie · by Chris Wei」。实现参考见 [源码核查记录](docs/tvbox-reference.md)，测试结果见 [验证记录](docs/validation.md)。
+原生 SwiftUI iPhone / iPad 应用，iOS 16 及以上。**0.5.0 起不再有任何站点域名硬编码**：应用打开配置时，从配置的 `spider` 字段下载插件包，在设备内静态解开 `jar → *.guard → 明文 classes.dex`，再从插件里读出每个采集器的域名、搜索模板与 CSS 选择器，交给统一采集引擎请求网页并由 AVPlayer 播放。站点换域名只需重新导入配置，不需要重编 IPA。
 
-全部 Android CSP 来源现已开放统一尝试：剩余来源按奥特 / MacCMS / JSON 通用规则处理，不以逐源测试通过作为开放条件。新配置出现未知类名会自动纳入；支持本机规则与配置携带 `ios` 规则，沿用已支持结构的新源无需重新编译 IPA。具体格式见 [通用来源规则](docs/generic-source-rules.md)。
+使用时不需要 Android 手机、盒子或自建解析服务器；不执行 Dalvik 字节码、不加载 `.so`、不跑安卓模拟器。
 
-原生 SwiftUI iPhone / iPad 应用，支持 iOS 16 及以上。已用 Xcode 16.4 编译 arm64 真机版本并生成未签名 IPA，可用自己的证书重新签名安装。
+## 这版删掉了什么
 
-应用在 iPhone 内通过 Swift 请求来源页面 / 公开接口并提取媒体，交给 AVPlayer 播放，**使用时不需要 Android 手机、盒子或自建解析服务器**。站点验证码仍提供 WebKit 验证入口，但视频播放不加载网页。编译使用 macOS GitHub Actions；构建服务不参与日常解析或播放。
-
-已在 iPhone 16 / iOS 18.5 模拟器完成用户真实配置的奥特和动漫巴士“选集 → HTTP 提取视频链接 → 详情页 AVPlayer 播放”，两条播放链路均没有 WKWebView。实体 iPhone 安装、AirPlay 和画中画尚未验证，完整结果以验证记录和交付包 `build-info.json` 为准。
-
-## 安装和第一次使用
-
-1. 使用自己的签名工具重新签名 `dist/iMovie-0.4.0-unsigned.ipa`，再安装到 iPhone。
-2. 打开「设置」，默认已填入 `http://www.饭太硬.cc/tv`，点击「导入 / 更新配置」。
-3. 回到「首页」，点击左上角选择点播源；选择结果会保留。默认首页展示推荐内容，上方可切换分类。
-4. 点击整张海报进入详情；初始显示封面和简介，选集后上方自动替换为播放器。切换集数在同一详情页完成。
-5. 「搜索」可同时查询专用适配和允许搜索的通用尝试来源；「我的」保存收藏和播放记录。
-6. 通用源缺少域名或结构不匹配时，会显示实际错误；在「设置 → 来源地址 / 通用规则」补充官网、JSON 接口或规则即可重试。
-
-更多操作见 [快速上手](docs/quick-start.md)。签名证书、描述文件和安装期限由所用签名方式决定。项目不需要保存你的 Apple ID 密码。
-
-## 饭太硬当前配置的支持范围
-
-本轮配置样本含 48 个点播条目、6 个直播列表，其中 45 个 Android Guard 条目和 3 个 drpy 条目；11 个 Android 条目使用专用 Swift 实现，剩余 34 个进入通用尝试。兔小贝另有专用 Swift 实现。本项目不执行原 Android 二进制。
-
-| 来源 / 能力 | 实现与验证 |
+| 删除项 | 原问题 |
 | --- | --- |
-| 动漫巴士 / Dm84 | 原生分类、搜索、详情和选集；HTTP 读取 iframe 与其原公开解析接口，不展示网页；已通过详情页内播放验证 |
-| B站公开内容 | 1 套本机适配对应配置中 7 个 Bili 条目；分类关键词、搜索、分 P、公开视频单文件 MP4；电脑端公开 API 和媒体 Range 请求通过，尚未完成 iOS 端该源的播放验证 |
-| 儿童 / 启蒙（兔小贝） | 独立 Swift 适配；分类、搜索、详情和公开 MP4 网络链路通过，尚未完成 iOS 端该源的播放验证 |
-| 立播 / Libvio | 实验性 HTML 适配；当前站点访问受限，未验证完整浏览与播放 |
-| 奥特 / Auete | 0.3.0 新增当前网站分类、海报、详情选集和公开 HLS 识别；最终构建首页到 AVPlayer 实际播放通过，搜索要求网站验证码时可在应用内手动验证 |
-| 急救 / FirstAid | 0.4.0 新增独立 Swift 适配，读取公开教学目录、按标题本机搜索并提取 MP4；电脑端网络链路及单元测试验证，未完成该源 iOS 播放验证 |
-| 其余 34 个 Android 条目 | 已全部开放；自动尝试官网 / JSON 配置、通用 HTML 列表 / 详情 / 选集及 HTTP 媒体取址，失败显示原因；可补充地址或数据规则，逐项状态见 `docs/source-port-status.json` |
-| 虎牙 / 斗鱼 drpy 条目 | 显示「脚本待适配」，没有完整 drpy 宿主 |
-| JSON 类型 1 / 4 | 可接入返回公开媒体地址的接口；分类、搜索、分页、详情、选集；本地测试配置完整流程通过。用户原配置没有这类源 |
-| 直播 | M3U / TXT / HLS 列表；6 个配置列表中 1 个依赖 Android localhost 代理，明确标为不可用；其余频道未逐一验证 |
+| `AueteAdapter` / `HTMLSourceAdapter` / `TuxiaobeiAdapter` / `BilibiliAdapter` / `FirstAidAdapter` | 每个都写死了站点域名（`www.aeete.com`、`dm84.tv`、`www.libvio.pw`、`www.tuxiaobei.com`…），站点迁移即失效 |
+| `NativeSourceAdapter` 枚举与 `SourceSite.type` | 靠 `type` + 类名白名单分发，新源必须发版 |
+| 硬编码兜底域名 / 搜索路径（`cz4k.com`、`xb6v.com`、`/auete4so.php?searchword=`、`/vodsearch/…`） | 猜出来的地址必然过期 |
+| 上述适配器对应的 3 个测试文件 | 随实现一起删除 |
 
-设置中「本机移植（实验）12」表示 6 套适配识别到的 12 个配置条目，「通用规则尝试34」表示其余 Android 条目均可直接进入，**不表示这些站点或线路全部实测可播**。45 个 Android 条目涉及 37 个不同实现，原 Guard 协议没有全部实现。全局搜索合并 B站分类条目，其余未知 CSP 按配置条目独立尝试；配置关闭搜索的来源不参与全局搜索，仍可从首页浏览。结果先显示按匹配度排列的影片，来源错误放在结果之后。
+保留并接通的是一套：**配置 → 插件包 → DEX 字符串 → 站点规则 → 通用网页采集**。
 
-TVBox / OK 影视也把通用播放器和 Spider 站点实现分开。iMovie 现将 HTML / JSON 的共性抽成可更新数据规则：后续饭太硬增加同类来源可直接导入尝试；若仅有 Android 类名与加固数据，需要补充公开网址；若新增签名、登录或专有取址协议，则需要扩展引擎。这一限制不会阻止来源出现在列表和执行通用尝试。
+## 新的解析链
 
-Android 归档包含 `classes.dex`、Android ELF `.so` 和 Guard 资源，不能直接装入 iOS。详见 [独立使用调查](docs/ios-standalone-research.md) 和 [原始接口检查](docs/interface-report.json)。
+```text
+配置 spider 字段            https://…/xxx.jpg;md5;9d5f341a…
+        │
+        ▼  下载 + 校验后解容器
+GuardContainer              ZIP 中央目录 / local header → {1,2,5,6} XOR 0x07 → raw inflate
+        │                   产出内层 classes.dex（2.72 MB）
+        ▼
+DexFile + DexInstruction    DEX 索引表、class_data、code_item、Dalvik 指令长度表
+        │
+        ▼
+GuardStringDecoder          fill-array-data 常量表 + D(short[],start,len,key) 调用折叠
+        │                   含无参 getter 转发、parseInt 常量折叠
+        ▼
+GuardRuleBuilder            按方法归属推断 baseURL / listSelector / searchURL / 选集选择器
+        │
+        ▼
+GenericSourceAdapter        SwiftSoup 采集列表、详情、选集 → MediaResolver 提取媒体
+```
 
-## 已实现的功能
+`Sources/Core/Guard/` 是这条链的全部实现，纯字节运算 + `Compression` 框架，无第三方密码库。相同算法在 `tools/dexrules/` 有一套 Python 参考实现，并有 `Tests/CoreTests/Fixtures/spider.jar`（与线上 md5 一致的插件包）作为回归夹具。
 
-- 中文深色 SwiftUI 界面，片库、搜索、直播、收藏 / 记录、设置。
-- TVBox JSON / JSONC、Base64、图片 `**` Base64 配置导入，处理注释、尾逗号、CRLF 换行和中文域名。
-- 已知来源的本机适配、分类、搜索、分页、详情和选集。
-- 未知 Android CSP 自动进入通用适配；支持奥特 / MacCMS 常见 HTML、JSON 采集接口、页面真实下一页链接与本机持久化规则。
-- 两栏跨来源搜索，左侧窄来源列表可过滤，右侧按完整片名、前缀、包含词和字符相关度递减排序。
-- HTTP 读取媒体元素、命名播放器配置、公开 Base64 / URL 编码地址及 iframe；按站点规则请求原解析接口，不执行原 Android 插件。
-- 直接粘贴视频地址；也可开启「从网页地址提取视频链接」，自动提取后系统播放。
-- 详情页嵌入 AVPlayer，系统全屏、AirPlay 和画中画入口；隐藏倍速选择。
-- 图片内存 32 MB / 磁盘 120 MB、14 天更新；片库缓存 3 分钟、豆瓣榜单 6 小时，合计最多 16 MB，设置可清理。配置、搜索和播放取址不使用片库缓存。
-- 豆瓣公开榜单取真实评分，至少 7 分和 100 人评价，按评分 / 评价数选 6 部轮播；点选后查找当前来源同名影片，无法读取评分时回退来源推荐。
-- 「设置 → 关于 iMovie」展示软件介绍、版本、开发者 Chris Wei 和 [GitHub 项目](https://github.com/Jwforever/iMovie)。仓库当前为私有，访问需要权限。
-- 本地收藏和播放记录；系统播放器的播放进度保存与恢复；保存来源和选集，重播时刷新有时效的媒体地址。
+## 实测覆盖
 
-AVPlayer 只能播放系统支持的编码。DRM、会员 / 网盘登录、磁力、P2P、UDP / RTSP、下载、弹幕、DLNA 和完整 drpy / Android 插件兼容尚未实现。网页媒体识别也不保证能处理所有 blob / MSE、Cookie 或特殊认证站点。
+用饭太硬当前配置（48 个点播条目，全部 `type=3`；6 个直播列表）跑一遍静态解析：45 个采集器里 **28 个能直接解出站点域名并生成规则**。
+
+| 站点 | 解出的主域 | 解出的规则 |
+| --- | --- | --- |
+| 奥特 / Auete | `www.au1080.top` | `ul.threadlist li` / `h2 a` / `auete4so.php?searchword={wd}&page={pg}` / `ul.episode-list li > a` |
+| 厂长 / NewCz | `www.4kcz.com` 等 7 个 | 列表、搜索、详情、选集 |
+| 立播 / Libvio | `www.libvio.io` | 同上 |
+| 比特 / Bttwoo | `www.bttwo.life` | 同上 |
+| 荐影 / YGP | `www.6huo.com` | 同上 |
+| 盘她 / YpanSo | `www.melost.cn` | 同上 |
+| 巴士 / Dm84 | `dmbus.cc` | 同上 |
+
+剩余 7 个影视条目（豆豆、光影/奶酪、热播、视界、剧圈、新6V）的域名**根本不在插件字符串里**：插件把它们放在路由层由 `ext` 或服务端下发，安卓端运行时才产生。这些来源会在界面上直接说明原因，并可手动填一个可访问的网址后按通用网页规则采集，不会凭空捏造域名。
+
+## 安装与第一次使用
+
+1. 用你自己的签名工具重签 `dist/iMovie-0.5.0-unsigned.ipa`，装到 iPhone / iPad。
+2. 「设置」已默认填入 `http://www.饭太硬.cc/tv`，点「导入 / 更新配置」。导入后会在后台预热插件解析。
+3. 「首页」左上角选择点播源；首次打开某个源时才按需解规则，之后走本机缓存。
+4. 详情页选集后上方直接播放，不加载原播放网页。
+5. 某个源报错时，界面会区分「插件里没有域名」和「网站要求验证」；前者去「设置 → 来源地址 / 通用规则」补地址即可。
 
 ## 构建
 
-需要 macOS、完整 Xcode 15 或更新版本及 XcodeGen。已验证环境为 Xcode 16.4 / iOS SDK 18.5。
+需要 macOS、完整 Xcode 15+ 与 XcodeGen（已验证 Xcode 16.4 / iOS SDK 18.5）。
 
 ```bash
 brew install xcodegen
 bash scripts/build-unsigned.sh
 ```
 
-脚本运行 Swift 核心测试，生成 Xcode 工程，编译 iPhoneOS arm64 Release 应用，检查 Mach-O 和真机平台后打包：
+脚本先跑 `swift test`（含插件包回归测试），再生成工程、编译 arm64 Release、检查 Mach-O 与平台后打包：
 
 ```text
-dist/iMovie-0.4.0-unsigned.ipa
-dist/iMovie-0.4.0-unsigned.ipa.sha256
+dist/iMovie-0.5.0-unsigned.ipa
+dist/iMovie-0.5.0-unsigned.ipa.sha256
 ```
 
-GitHub 私有仓库内已运行 `.github/workflows/ios.yml`。在 Actions 中选择「Build unsigned iOS app → Run workflow」可以重新编译；`iMovie-unsigned-ipa` 为签名前产物，`iMovie-simulator-evidence` 为测试截图与 xcresult。云端产物保留 7 天，本地 `dist/` 文件不会因此过期。
-
-直接用 Xcode 调试：运行 `xcodegen generate`，打开 `iMovie.xcodeproj`，配置自己的 Team、Bundle ID 与签名后运行。
+Windows 无法编译 iOS 应用；本仓库通过 `.github/workflows/ios.yml` 在 macOS runner 上构建，Actions 产物 `iMovie-unsigned-ipa` 即签名前 IPA。
 
 ## 验证
 
-- 核心测试覆盖配置、来源、HTTP 媒体提取、搜索匹配度、豆瓣评分过滤和片库缓存，最终数量见验证记录。
-- 8 项 Python 工具测试通过。
-- 1 项浏览器测试通过，覆盖 DOM / fetch / iframe 媒体识别、去重、URL scheme 过滤、跨 iframe 暂停。
-- 9 项 iOS 模拟器流程覆盖原有播放功能及整张海报点击、初始不加载播放器、详情页选集、四次横竖屏切换且视频帧与进度持续、搜索排序 / 筛选、轮播 / 关于、图片缓存重启复用 / 清理，以及未知 CSP 通用播放、缺地址错误与本机规则保存。最终结果见验证记录。
-- 真机 arm64 Release 构建及 IPA 打包通过；未在实体 iPhone 安装或验证 AirPlay / 画中画。
-
-完整证据和限制见 [验证记录](docs/validation.md)。运行方法：
-
 ```bash
-swift test
+swift test                                            # 含真实插件包解码回归
 python3 -m unittest discover -s Tests/Python -v
-npm install
-npx playwright install chromium
-npm run test:browser
-# macOS：xcodegen generate 后执行
-bash scripts/test-simulator.sh
+npm install && npx playwright install chromium && npm run test:browser
 ```
 
-Windows 已安装 Edge 时，可设置 `IMOVIE_BROWSER_CHANNEL=msedge` 运行浏览器测试，无需额外下载 Chromium。测试用本地视频由 AVFoundation 生成，不随 IPA 分发。
+`GuardPluginTests` 用真实 jar 断言：容器解出的 DEX 为 2,728,036 字节、常量表 > 100 张、Auete 解出 `www.au1080.top` 且能生成完整规则、SixV 无域名时不生成规则。
 
 ## 结构
 
 ```text
-Sources/App/       SwiftUI、AVPlayer、WebKit、本地存储
-Sources/Core/      配置、直播列表、JSON API、HTML 与公开来源适配
-Resources/         图标、Info.plist、隐私清单、媒体观察脚本、组件许可
-Tests/CoreTests/   核心 Swift 行为测试
-Tests/UITests/     iOS 界面与播放流程测试
-Tests/Fixtures/    本地测试站点与生成视频
-Tests/Browser/     网页媒体观察脚本测试
-Tests/Python/      配置检查与 IPA 打包工具测试
-scripts/           诊断、构建、模拟器和打包脚本
-docs/              使用说明、调查与验证记录
+Sources/App/        SwiftUI、AVPlayer、WebKit、本地存储
+Sources/Core/       配置解码、JSON 接口、通用网页采集、媒体提取
+Sources/Core/Guard/ 插件解包 + DEX 字符串解码 + 规则生成
+Resources/          图标、Info.plist、隐私清单、组件许可
+Tests/CoreTests/    核心测试（含真实插件包夹具）
+Tests/UITests/      iOS 界面与播放流程测试
+tools/dexrules/     Python 参考实现与取证脚本
+docs/               调查、验证与交接记录
+scripts/            构建、模拟器、打包脚本
 ```
 
-应用独立实现，没有复制 OK 影视的 Android 源码。HTML 解析使用 MIT 许可的 SwiftSoup 2.9.6，许可附在应用的「设置 → 开源组件许可」和 `Resources/ThirdPartyNotices.txt`。
+HTML 解析使用 MIT 许可的 SwiftSoup 2.9.6，许可见「设置 → 开源组件许可」与 `Resources/ThirdPartyNotices.txt`。项目不包含任何影视内容，配置与媒体由使用者自行提供。

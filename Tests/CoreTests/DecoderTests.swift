@@ -23,7 +23,7 @@ final class DecoderTests: XCTestCase {
         let result = try ConfigDecoder.decode(data, sourceURL: sourceURL)
         XCTAssertEqual(result.sites.count, 3)
         XCTAssertEqual(result.sites[0].api, "csp_Guard")
-        XCTAssertEqual(result.sites[0].runtime, .android)
+        XCTAssertEqual(result.sites[0].runtime, .plugin)
         XCTAssertEqual(result.sites[1].runtime, .javascript)
         XCTAssertEqual(result.sites[2].runtime, .jsonAPI)
         XCTAssertEqual(result.sites[2].api, "https://example.test/api?url=a//b")

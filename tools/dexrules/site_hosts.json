@@ -1,0 +1,500 @@
+[
+ {
+  "key": "厂长",
+  "name": "📔厂长┃不卡",
+  "api": "csp_NewCzGuard",
+  "class": "NewCz",
+  "isSite": true,
+  "hosts": [
+   "czzy.xn--t75a.eu.org",
+   "jx.yangtu.top",
+   "pla.py1080p.com",
+   "t02.cz01.org",
+   "t0o1.czzy.fun",
+   "video.nowwon.xyz",
+   "www.4kcz.com"
+  ],
+  "strings": 267
+ },
+ {
+  "key": "风云",
+  "name": "☁️风云┃多线",
+  "api": "csp_FyGuard",
+  "class": "Fy",
+  "isSite": true,
+  "hosts": [
+   "fgsrg.hzqingshan.com",
+   "maihaolian.com",
+   "php.doube.eu.org",
+   "py.fzcrym.link",
+   "self.host",
+   "www.ht10010.com",
+   "zzrs.mfdyvip.com"
+  ],
+  "strings": 2
+ },
+ {
+  "key": "抠搜",
+  "name": "🌶️抠抠┃搜搜",
+  "api": "csp_KkSsGuard",
+  "class": "KkSs",
+  "isSite": true,
+  "hosts": [
+   "2xiaopan.fun",
+   "feimao666.fun",
+   "mihdr.top",
+   "tv.yydsys.top",
+   "www.miqk.cc",
+   "xiaocge.fun",
+   "xiaomi666.fun"
+  ],
+  "strings": 45
+ },
+ {
+  "key": "玩偶",
+  "name": "👽玩偶哥哥┃4K弹幕",
+  "api": "csp_WoGGGuard",
+  "class": "WoGG",
+  "isSite": true,
+  "hosts": [
+   "edgeong.wogg.333232.xyz",
+   "woggpan.333232.xyz",
+   "woggpan.888484.xyz",
+   "www.wogg.live",
+   "www.wogg.net"
+  ],
+  "strings": 130
+ },
+ {
+  "key": "有声小说",
+  "name": "🎧有声┃小说",
+  "api": "csp_YueTingGuard",
+  "class": "YueTing",
+  "isSite": true,
+  "hosts": [
+   "appp.fdhtbz.cn",
+   "json.tingyou8.vip",
+   "laopaoaappi.oobyvy.vip",
+   "toudnbbaa.tou1laopao.cc",
+   "toudnbbaa.toulaopao1.cc"
+  ],
+  "strings": 77
+ },
+ {
+  "key": "UC",
+  "name": "🌈优汐┃搜搜",
+  "api": "csp_UuSsGuard",
+  "class": "UuSs",
+  "isSite": true,
+  "hosts": [
+   "123.666291.xyz",
+   "666.666291.xyz",
+   "milvdou.fun",
+   "www.muou.site",
+   "xsayang.fun"
+  ],
+  "strings": 47
+ },
+ {
+  "key": "荐片",
+  "name": "🥝荐片┃多线",
+  "api": "csp_JPJGuard",
+  "class": "JPJ",
+  "isSite": true,
+  "hosts": [
+   "fan123.cqxkn.com",
+   "img.cqkgy.com",
+   "swrdsfeiujo25sw.cc"
+  ],
+  "strings": 62
+ },
+ {
+  "key": "奥特",
+  "name": "🏝奥特┃多线",
+  "api": "csp_AueteGuard",
+  "class": "Auete",
+  "isSite": true,
+  "hosts": [
+   "cache.haozhansou.com",
+   "haozhansou.com",
+   "www.au1080.top"
+  ],
+  "strings": 118
+ },
+ {
+  "key": "MDrive",
+  "name": "🗂我的云盘┃配置",
+  "api": "csp_MyDriveGuard",
+  "class": "MyDrive",
+  "isSite": true,
+  "hosts": [
+   "drive-pc.quark.cn",
+   "pc-api.uc.cn"
+  ],
+  "strings": 206
+ },
+ {
+  "key": "Dm84",
+  "name": "🚌巴士┃动漫",
+  "api": "csp_Dm84Guard",
+  "class": "Dm84",
+  "isSite": true,
+  "hosts": [
+   "dmbus.cc",
+   "hhjx.hhplayer.com"
+  ],
+  "strings": 65
+ },
+ {
+  "key": "看球",
+  "name": "⚽八八┃看球",
+  "api": "csp_KanqiuGuard",
+  "class": "Kanqiu",
+  "isSite": true,
+  "hosts": [
+   "pic.imgdb.cn",
+   "www.88kanqiu.pw"
+  ],
+  "strings": 67
+ },
+ {
+  "key": "YGP",
+  "name": "🚀荐影┃预告片",
+  "api": "csp_YGPGuard",
+  "class": "YGP",
+  "isSite": true,
+  "hosts": [
+   "www.6huo.com"
+  ],
+  "strings": 132
+ },
+ {
+  "key": "MTV1",
+  "name": "🎙️易听┃音乐",
+  "api": "csp_MusicGuard",
+  "class": "Music",
+  "isSite": true,
+  "hosts": [
+   "www.4c44.com"
+  ],
+  "strings": 138
+ },
+ {
+  "key": "seed",
+  "name": "💡聚剧┃四盘",
+  "api": "csp_SeedhubGuard",
+  "class": "Seedhub",
+  "isSite": true,
+  "hosts": [
+   "seedhub.pro"
+  ],
+  "strings": 136
+ },
+ {
+  "key": "海绵",
+  "name": "🐬海绵┃不卡",
+  "api": "csp_HmysGuard",
+  "class": "Hmys",
+  "isSite": true,
+  "hosts": [
+   "u.yyxdmn.com"
+  ],
+  "strings": 318
+ },
+ {
+  "key": "立播",
+  "name": "🌟立播┃不卡",
+  "api": "csp_LibvioGuard",
+  "class": "Libvio",
+  "isSite": true,
+  "hosts": [
+   "www.libvio.io"
+  ],
+  "strings": 173
+ },
+ {
+  "key": "瓜子",
+  "name": "👀瓜子┃不卡",
+  "api": "csp_AppgzGuard",
+  "class": "Appgz",
+  "isSite": true,
+  "hosts": [
+   "api.nstpsw.com"
+  ],
+  "strings": 289
+ },
+ {
+  "key": "比特",
+  "name": "🍄比特┃不卡",
+  "api": "csp_BttwooGuard",
+  "class": "Bttwoo",
+  "isSite": true,
+  "hosts": [
+   "www.bttwo.life"
+  ],
+  "strings": 56
+ },
+ {
+  "key": "糯米",
+  "name": "🍓糯米┃秒播",
+  "api": "csp_NmyswvGuard",
+  "class": "Nmyswv",
+  "isSite": true,
+  "hosts": [
+   "vip.wwgz.cn"
+  ],
+  "strings": 90
+ },
+ {
+  "key": "文采",
+  "name": "💮文采┃秒播",
+  "api": "csp_JpysGuard",
+  "class": "Jpys",
+  "isSite": true,
+  "hosts": [
+   "www.ghw9zwp5.com"
+  ],
+  "strings": 117
+ },
+ {
+  "key": "AiDj",
+  "name": "❤️AI剧┃弹幕",
+  "api": "csp_AiDjGuard",
+  "class": "AiDj",
+  "isSite": true,
+  "hosts": [
+   "3.7.2.cn"
+  ],
+  "strings": 663
+ },
+ {
+  "key": "多多",
+  "name": "🏀多多┃回放",
+  "api": "csp_DoubaoGuard",
+  "class": "Doubao",
+  "isSite": true,
+  "hosts": [
+   "www.doubaozhibo.com"
+  ],
+  "strings": 194
+ },
+ {
+  "key": "吃瓜",
+  "name": "🏐吃瓜┃看球",
+  "api": "csp_LiveGzGuard",
+  "class": "LiveGz",
+  "isSite": true,
+  "hosts": [
+   "api.5h5hbfhh.com"
+  ],
+  "strings": 98
+ },
+ {
+  "key": "ZPan",
+  "name": "🎈盘搜┃四盘",
+  "api": "csp_S_zpsGuard",
+  "class": "S_zps",
+  "isSite": true,
+  "hosts": [
+   "so.252035.xyz"
+  ],
+  "strings": 67
+ },
+ {
+  "key": "JPan",
+  "name": "🦋易搜┃四盘",
+  "api": "csp_S_zpsGuard",
+  "class": "S_zps",
+  "isSite": true,
+  "hosts": [
+   "so.252035.xyz"
+  ],
+  "strings": 67
+ },
+ {
+  "key": "YpanSo",
+  "name": "🐌盘她┃夸父",
+  "api": "csp_YpanSoGuard",
+  "class": "YpanSo",
+  "isSite": true,
+  "hosts": [
+   "www.melost.cn"
+  ],
+  "strings": 20
+ },
+ {
+  "key": "BpanSo",
+  "name": "🐞盘他┃嘟嘟",
+  "api": "csp_BpanSoGuard",
+  "class": "BpanSo",
+  "isSite": true,
+  "hosts": [
+   "www.melost.cn"
+  ],
+  "strings": 20
+ },
+ {
+  "key": "push_agent",
+  "name": "🛴手机┃推送",
+  "api": "csp_PushGuard",
+  "class": "Push",
+  "isSite": true,
+  "hosts": [
+   "drive.uc.cn"
+  ],
+  "strings": 24
+ },
+ {
+  "key": "点我切源",
+  "name": "豆豆┃片单 <兼容安卓4>",
+  "api": "csp_DouDouGuard",
+  "class": "DouDou",
+  "isSite": true,
+  "hosts": [],
+  "strings": 109
+ },
+ {
+  "key": "光影",
+  "name": "🌞光影┃不卡",
+  "api": "csp_T4Guard",
+  "class": "T4",
+  "isSite": true,
+  "hosts": [],
+  "strings": 84
+ },
+ {
+  "key": "奶酪",
+  "name": "🧀奶酪┃秒播",
+  "api": "csp_T4Guard",
+  "class": "T4",
+  "isSite": true,
+  "hosts": [],
+  "strings": 84
+ },
+ {
+  "key": "热播",
+  "name": "📺热播┃多线",
+  "api": "csp_AppTTGuard",
+  "class": "AppTT",
+  "isSite": true,
+  "hosts": [],
+  "strings": 107
+ },
+ {
+  "key": "视界",
+  "name": "🌸茉莉┃多线",
+  "api": "csp_App99Guard",
+  "class": "App99",
+  "isSite": true,
+  "hosts": [],
+  "strings": 237
+ },
+ {
+  "key": "剧圈",
+  "name": "🐻剧圈┃多线",
+  "api": "csp_AppSxGuard",
+  "class": "AppSx",
+  "isSite": true,
+  "hosts": [],
+  "strings": 297
+ },
+ {
+  "key": "新6V",
+  "name": "🧲新6V┃磁力",
+  "api": "csp_SixVGuard",
+  "class": "SixV",
+  "isSite": true,
+  "hosts": [],
+  "strings": 102
+ },
+ {
+  "key": "alllive",
+  "name": "🎮一直播┃直播",
+  "api": "csp_AllliveGuard",
+  "class": "Alllive",
+  "isSite": true,
+  "hosts": [],
+  "strings": 181
+ },
+ {
+  "key": "Aid",
+  "name": "🚑急救┃教学",
+  "api": "csp_FirstAidGuard",
+  "class": "FirstAid",
+  "isSite": true,
+  "hosts": [],
+  "strings": 60
+ },
+ {
+  "key": "cc",
+  "name": "请勿信视频中任何广告",
+  "api": "csp_XPathGuard",
+  "class": "XPath",
+  "isSite": true,
+  "hosts": [],
+  "strings": 0
+ },
+ {
+  "key": "MTV",
+  "name": "🎶明星┃MV",
+  "api": "csp_BiliGuard",
+  "class": "Bili",
+  "isSite": false,
+  "hosts": [],
+  "strings": 263
+ },
+ {
+  "key": "Bili",
+  "name": "🅱哔哔合集┃弹幕",
+  "api": "csp_BiliGuard",
+  "class": "Bili",
+  "isSite": false,
+  "hosts": [],
+  "strings": 263
+ },
+ {
+  "key": "Biliych",
+  "name": "🅱哔哔演唱会┃弹幕",
+  "api": "csp_BiliGuard",
+  "class": "Bili",
+  "isSite": false,
+  "hosts": [],
+  "strings": 263
+ },
+ {
+  "key": "少儿教育",
+  "name": "📚少儿┃教育",
+  "api": "csp_BiliGuard",
+  "class": "Bili",
+  "isSite": false,
+  "hosts": [],
+  "strings": 263
+ },
+ {
+  "key": "小学课堂",
+  "name": "📚小学┃课堂",
+  "api": "csp_BiliGuard",
+  "class": "Bili",
+  "isSite": false,
+  "hosts": [],
+  "strings": 263
+ },
+ {
+  "key": "初中课堂",
+  "name": "📚初中┃课堂",
+  "api": "csp_BiliGuard",
+  "class": "Bili",
+  "isSite": false,
+  "hosts": [],
+  "strings": 263
+ },
+ {
+  "key": "高中教育",
+  "name": "📚高中┃课堂",
+  "api": "csp_BiliGuard",
+  "class": "Bili",
+  "isSite": false,
+  "hosts": [],
+  "strings": 263
+ }
+]

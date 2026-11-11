@@ -23,7 +23,7 @@ import WebKit
         configuration.userContentController.add(WeakMessageHandler(self), name: "iMovieMedia")
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        webView.customUserAgent = HTMLSourceAdapter.userAgent
+        webView.customUserAgent = BrowserProfile.userAgent
         webView.isOpaque = false
         webView.backgroundColor = .black
     }
@@ -46,7 +46,7 @@ import WebKit
               let pageValue = payload["page"] as? String, let page = HTTPAddress.optional(pageValue),
               let frame = message.frameInfo.request.url, frame.host == page.host,
               candidates.count < 20, !candidates.contains(where: { $0.url == url.absoluteString }) else { return }
-        var headers = ["User-Agent": HTMLSourceAdapter.userAgent]
+        var headers = ["User-Agent": BrowserProfile.userAgent]
         let policy = (payload["referrerPolicy"] as? String ?? "").lowercased()
         if policy != "no-referrer" {
             var origin = URLComponents()

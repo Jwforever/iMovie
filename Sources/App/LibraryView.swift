@@ -64,11 +64,11 @@ import SwiftUI
     var body: some View {
         NavigationStack {
             List {
-                Section("专用适配 / JSON 接口") {
-                    ForEach(sites.filter { $0.isNative && !$0.usesGenericAdapter }) { sourceRow($0) }
+                Section("插件来源 · 本机解析") {
+                    ForEach(sites.filter { $0.isPlugin }) { sourceRow($0) }
                 }
-                if sites.contains(where: \.usesGenericAdapter) {
-                    Section("通用尝试 · 点击直接打开") { ForEach(sites.filter(\.usesGenericAdapter)) { sourceRow($0) } }
+                if sites.contains(where: { $0.runtime == .jsonAPI }) {
+                    Section("JSON 接口") { ForEach(sites.filter { $0.runtime == .jsonAPI }) { sourceRow($0) } }
                 }
                 if sites.contains(where: { !$0.isNative }) {
                     Section("其他来源") { ForEach(sites.filter { !$0.isNative }) { sourceRow($0) } }
@@ -89,7 +89,7 @@ import SwiftUI
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(site.name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
-                    Text(site.usesGenericAdapter ? "通用规则 · 可能需要来源地址" : site.isNative ? (site.searchable ? "分类 · 搜索 · 选集" : "分类 · 选集") : site.runtime.title)
+                    Text(site.isNative ? (site.searchable ? "分类 · 搜索 · 选集" : "分类 · 选集") : site.runtime.title)
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -152,6 +152,7 @@ import SwiftUI
     @State private var error: String?
     @State private var requestToken = UUID()
     @State private var verifyingSource = false
+    @State private var verifyURL: URL?
     private let client = TVAPIClient()
     private var isHome: Bool { category.isEmpty && activeSearch.isEmpty }
 
@@ -163,7 +164,7 @@ import SwiftUI
                         EmptyPanel(icon: "puzzlepiece.extension", title: site.runtime.title, message: site.runtime.explanation)
                         Text("来源标识").font(.headline)
                         Text(site.api).font(.caption.monospaced()).textSelection(.enabled).foregroundStyle(.secondary)
-                        Text("这个来源尚未完成本机适配。已适配的来源会标记为“本机适配·实验”。")
+                        Text("这个来源没有可用的解析方式。插件源会现场解开配置指定的 spider 包；脚本源暂时没有运行时。")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }.padding(20)
                 }
@@ -184,11 +185,9 @@ import SwiftUI
                         .accessibilityIdentifier("home-content-heading")
                         if let error {
                             EmptyPanel(icon: "wifi.exclamationmark", title: "加载失败", message: error)
-                            if site.usesGenericAdapter {
-                                NavigationLink("来源地址 / 通用规则") { SourceRuleEditor(site: site) }.buttonStyle(.borderedProminent)
-                            }
-                            if site.nativeAdapter == .auete {
-                                Button("在网页中验证后重试") { verifyingSource = true }
+                            if site.isPlugin {
+                                NavigationLink("来源地址 / 规则") { SourceRuleEditor(site: site) }.buttonStyle(.borderedProminent)
+                                Button("在网页中验证后重试") { openVerification() }
                                     .buttonStyle(.borderedProminent).accessibilityIdentifier("source-verify")
                             }
                             Button("重试") { Task { await load(reset: true) } }.buttonStyle(.bordered)
@@ -238,8 +237,18 @@ import SwiftUI
         .navigationTitle(embedded ? "" : Theme.sourceName(site.name)).navigationBarTitleDisplayMode(.inline)
         .task { if site.isNative && videos.isEmpty { await load(reset: true) } }
         .sheet(isPresented: $verifyingSource, onDismiss: { Task { await load(reset: true) } }) {
-            if let url = try? AueteAdapter.pageURL(category: category, search: activeSearch, page: 1) {
-                SourceVerificationView(url: url)
+            if let verifyURL { SourceVerificationView(url: verifyURL) }
+        }
+    }
+
+    private func openVerification() {
+        Task {
+            if let rule = try? await GenericSourceAdapter(site: site).rule(),
+               let url = HTTPAddress.optional(rule.baseURL) {
+                verifyURL = url
+                verifyingSource = true
+            } else {
+                store.error = "还没有解出这个来源的网站地址，可以先在“来源规则”里填写。"
             }
         }
     }
@@ -425,6 +434,7 @@ import SwiftUI
     @State private var selectedLine: String?
     @State private var error: String?
     @State private var verifyingDetail = false
+    @State private var verifyURL: URL?
     private let client = TVAPIClient()
 
     var body: some View {
@@ -473,8 +483,8 @@ import SwiftUI
                 if loading { ProgressView("正在加载选集…") }
                 if let error {
                     Text(error).font(.subheadline).foregroundStyle(.orange)
-                    if site.nativeAdapter == .auete || site.usesGenericAdapter {
-                        Button("打开网站验证") { verifyingDetail = true }.buttonStyle(.bordered)
+                    if site.isPlugin {
+                        Button("打开网站验证") { openDetailVerification() }.buttonStyle(.bordered)
                             .accessibilityIdentifier("detail-verify")
                     }
                     Button("重新加载") { Task { await fetchDetail() } }.buttonStyle(.bordered)
@@ -513,9 +523,7 @@ import SwiftUI
         .toolbar(selection == nil ? .visible : .hidden, for: .tabBar)
         .task { await fetchDetail() }
         .sheet(isPresented: $verifyingDetail, onDismiss: { Task { await fetchDetail() } }) {
-            if let url = HTTPAddress.optional(video.id, relativeTo: HTTPAddress.optional(site.genericRule?.baseURL ?? AueteAdapter.origin.absoluteString)) {
-                SourceVerificationView(url: url)
-            }
+            if let verifyURL { SourceVerificationView(url: verifyURL) }
         }
         .onChange(of: scenePhase) { phase in
             if phase != .active, let media = playback.media { store.record(media, position: playback.position) }
@@ -530,6 +538,18 @@ import SwiftUI
         do { detail = try await client.detail(site: site, id: video.id) }
         catch is CancellationError { }
         catch { self.error = error.localizedDescription }
+    }
+
+    private func openDetailVerification() {
+        Task {
+            let base = (try? await GenericSourceAdapter(site: site).rule())?.baseURL ?? ""
+            if let url = HTTPAddress.optional(video.id, relativeTo: HTTPAddress.optional(base)) {
+                verifyURL = url
+                verifyingDetail = true
+            } else {
+                store.error = "还没有解出这个来源的网站地址。"
+            }
+        }
     }
 
     @MainActor private func play(_ episode: Episode, line: String) {

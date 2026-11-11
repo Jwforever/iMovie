@@ -11,7 +11,7 @@ import SwiftUI
                 NavigationLink { SourceRuleEditor(site: site) } label: {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(site.name).font(.subheadline)
-                        Text(site.genericRule?.baseURL ?? (site.usesGenericAdapter ? "自动识别 · 通用尝试" : "使用专用适配"))
+                        Text(site.genericRule?.baseURL ?? (site.isPlugin ? "插件自动解出 · 可手动覆盖" : site.runtime.title))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }.accessibilityIdentifier("rule-source-\(site.key)")
@@ -42,7 +42,7 @@ import SwiftUI
                     Text("网页 / 奥特 / MacCMS").tag("html")
                     Text("JSON 采集接口").tag("json")
                 }
-                Text("保存后该来源使用通用适配。新源只要沿用已支持的 HTML / JSON 结构，更新地址或规则即可尝试，无需重新开发。")
+                Text("保存后这个来源改用你填写的地址与规则，优先级高于插件里解出的规则。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("高级规则（可选 JSON）") {

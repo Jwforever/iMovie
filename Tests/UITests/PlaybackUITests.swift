@@ -319,10 +319,10 @@ final class PlaybackUITests: XCTestCase {
         app.buttons["detail-back"].tap()
         app.buttons["home-source-picker"].tap()
         app.buttons["source-missing"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "没有提供可读取的网站地址")).firstMatch.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["来源地址 / 通用规则"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "没有可用的插件地址")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["来源地址 / 规则"].exists)
         capture("29-generic-source-error")
-        app.buttons["来源地址 / 通用规则"].tap()
+        app.buttons["来源地址 / 规则"].tap()
         let address = app.textFields["source-rule-address"]
         XCTAssertTrue(address.waitForExistence(timeout: 5))
         address.tap()

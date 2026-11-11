@@ -16,7 +16,7 @@ public struct MediaResolver {
             let (url, depth, referer) = pending.removeFirst()
             guard depth < 4, seen.insert(url.absoluteString).inserted else { continue }
             var headers = source.headers
-            headers["User-Agent"] = headers["User-Agent"] ?? HTMLSourceAdapter.userAgent
+            headers["User-Agent"] = headers["User-Agent"] ?? BrowserProfile.userAgent
             if let referer { headers["Referer"] = referer }
             do {
                 let (data, final) = try await http.data(from: url, headers: headers)
@@ -66,10 +66,21 @@ public struct MediaResolver {
         return result
     }
 
+    /// 播放页把地址写成 `var now = base64decode("...")` 的形式。
+    static func playerBase64URL(_ data: Data) -> URL? {
+        guard let html = String(data: data, encoding: .utf8),
+              let regex = try? NSRegularExpression(pattern: #"\bvar\s+now\s*=\s*base64decode\(["']([A-Za-z0-9+/=]+)["']\)"#),
+              let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+              let range = Range(match.range(at: 1), in: html),
+              let bytes = Data(base64Encoded: String(html[range])), let value = String(data: bytes, encoding: .utf8),
+              HTTPAddress.isMedia(value) else { return nil }
+        return HTTPAddress.optional(value)
+    }
+
     static func publicMedia(in data: Data, baseURL: URL) -> [URL] {
         guard let html = String(data: data, encoding: .utf8) else { return [] }
         var values: [String] = []
-        if let url = AueteAdapter.decodePlayer(data) { values.append(url.absoluteString) }
+        if let url = Self.playerBase64URL(data) { values.append(url.absoluteString) }
         if let doc = try? SwiftSoup.parse(html, baseURL.absoluteString) {
             for item in (try? doc.select("video[src], audio[src], source[src], [video-src]").array()) ?? [] {
                 if let value = try? item.attr(item.hasAttr("video-src") ? "video-src" : "src") { values.append(value) }

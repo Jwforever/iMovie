@@ -1,0 +1,504 @@
+{
+  "generatedAt": "2026-11-11T09:01:44+00:00",
+  "configFrom": "file:imovie_cfg.json",
+  "subscriptions": [
+    "https://raw.githubusercontent.com/dlgt7/TVbox-interface/main/xbiu/auete.json"
+  ],
+  "note": "Site addresses are data, not code. Refresh this file or let the app fetch subscriptions at runtime; no IPA rebuild is needed when a site changes host.",
+  "sources": [
+    {
+      "key": "点我切源",
+      "name": "豆豆┃片单 <兼容安卓4>",
+      "api": "csp_DouDouGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "MDrive",
+      "name": "🗂我的云盘┃配置",
+      "api": "csp_MyDriveGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "玩偶",
+      "name": "👽玩偶哥哥┃4K弹幕",
+      "api": "csp_WoGGGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "YGP",
+      "name": "🚀荐影┃预告片",
+      "api": "csp_YGPGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "MTV1",
+      "name": "🎙️易听┃音乐",
+      "api": "csp_MusicGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "seed",
+      "name": "💡聚剧┃四盘",
+      "api": "csp_SeedhubGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "光影",
+      "name": "🌞光影┃不卡",
+      "api": "csp_T4Guard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "厂长",
+      "name": "📔厂长┃不卡",
+      "api": "csp_NewCzGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "海绵",
+      "name": "🐬海绵┃不卡",
+      "api": "csp_HmysGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "立播",
+      "name": "🌟立播┃不卡",
+      "api": "csp_LibvioGuard",
+      "kind": "entry",
+      "configUrl": "https://www.libvio.pw/",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "瓜子",
+      "name": "👀瓜子┃不卡",
+      "api": "csp_AppgzGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "比特",
+      "name": "🍄比特┃不卡",
+      "api": "csp_BttwooGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "糯米",
+      "name": "🍓糯米┃秒播",
+      "api": "csp_NmyswvGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "文采",
+      "name": "💮文采┃秒播",
+      "api": "csp_JpysGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "奶酪",
+      "name": "🧀奶酪┃秒播",
+      "api": "csp_T4Guard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "热播",
+      "name": "📺热播┃多线",
+      "api": "csp_AppTTGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "风云",
+      "name": "☁️风云┃多线",
+      "api": "csp_FyGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "视界",
+      "name": "🌸茉莉┃多线",
+      "api": "csp_App99Guard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "剧圈",
+      "name": "🐻剧圈┃多线",
+      "api": "csp_AppSxGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "荐片",
+      "name": "🥝荐片┃多线",
+      "api": "csp_JPJGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "奥特",
+      "name": "🏝奥特┃多线",
+      "api": "csp_AueteGuard",
+      "kind": "entry",
+      "configUrl": "https://auete.com/",
+      "origin": "subscription",
+      "rule": {
+        "ruleSource": "https://raw.githubusercontent.com/dlgt7/TVbox-interface/main/xbiu/auete.json",
+        "entryUrl": "https://auete.com/",
+        "homeUrl": "https://auete.com/{cateId}/index{catePg}.html",
+        "cateManual": {
+          "电影": "Movie",
+          "电视剧": "Tv",
+          "综艺": "Zy",
+          "动漫": "Dm"
+        },
+        "listUrl": "https://auete.com/{cateId}/index{catePg}.html",
+        "detailUrl": "https://auete.com/{vid}",
+        "searchUrl": "https://auete.com/search.php?searchword={wd}",
+        "playlistUrl": null
+      },
+      "discoveredHost": null
+    },
+    {
+      "key": "新6V",
+      "name": "🧲新6V┃磁力",
+      "api": "csp_SixVGuard",
+      "kind": "entry",
+      "configUrl": "https://www.xb6v.com/",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "AiDj",
+      "name": "❤️AI剧┃弹幕",
+      "api": "csp_AiDjGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "Dm84",
+      "name": "🚌巴士┃动漫",
+      "api": "csp_Dm84Guard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "看球",
+      "name": "⚽八八┃看球",
+      "api": "csp_KanqiuGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "多多",
+      "name": "🏀多多┃回放",
+      "api": "csp_DoubaoGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "吃瓜",
+      "name": "🏐吃瓜┃看球",
+      "api": "csp_LiveGzGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "alllive",
+      "name": "🎮一直播┃直播",
+      "api": "csp_AllliveGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "MTV",
+      "name": "🎶明星┃MV",
+      "api": "csp_BiliGuard",
+      "kind": "data",
+      "configUrl": "https://nos.netease.com/ysf/5af5fbe12a88b7c45aa1c21e6551826c.txt",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "有声小说",
+      "name": "🎧有声┃小说",
+      "api": "csp_YueTingGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "Aid",
+      "name": "🚑急救┃教学",
+      "api": "csp_FirstAidGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "虎牙js",
+      "name": "🐯虎牙┃直播",
+      "api": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "kind": "data",
+      "configUrl": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/虎牙.js",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "斗鱼js",
+      "name": "🐟斗鱼┃直播",
+      "api": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "kind": "data",
+      "configUrl": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/斗鱼直播.js",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "ZPan",
+      "name": "🎈盘搜┃四盘",
+      "api": "csp_S_zpsGuard",
+      "kind": "entry",
+      "configUrl": "http://107.173.211.148/",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "JPan",
+      "name": "🦋易搜┃四盘",
+      "api": "csp_S_zpsGuard",
+      "kind": "entry",
+      "configUrl": "https://so.252035.xyz/",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "YpanSo",
+      "name": "🐌盘她┃夸父",
+      "api": "csp_YpanSoGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "BpanSo",
+      "name": "🐞盘他┃嘟嘟",
+      "api": "csp_BpanSoGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "抠搜",
+      "name": "🌶️抠抠┃搜搜",
+      "api": "csp_KkSsGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "UC",
+      "name": "🌈优汐┃搜搜",
+      "api": "csp_UuSsGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "Bili",
+      "name": "🅱哔哔合集┃弹幕",
+      "api": "csp_BiliGuard",
+      "kind": "data",
+      "configUrl": "https://nos.netease.com/ysf/0075389dca9afadd4614e9713765ff17.txt",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "Biliych",
+      "name": "🅱哔哔演唱会┃弹幕",
+      "api": "csp_BiliGuard",
+      "kind": "data",
+      "configUrl": "https://nos.netease.com/ysf/6496356286589c68f52c2f99c0c674c7.txt",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "dr_兔小贝",
+      "name": "📚儿童┃启蒙",
+      "api": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/drpy2.min.js",
+      "kind": "data",
+      "configUrl": "https://ghproxy.net/https://raw.githubusercontent.com/fantaiying7/EXT/refs/heads/main/%E5%85%94%E5%B0%8F%E8%B4%9D.js",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "少儿教育",
+      "name": "📚少儿┃教育",
+      "api": "csp_BiliGuard",
+      "kind": "data",
+      "configUrl": "https://nos.netease.com/ysf/89370c8ddf36b5e1beb4d71adb921bda.txt",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "小学课堂",
+      "name": "📚小学┃课堂",
+      "api": "csp_BiliGuard",
+      "kind": "data",
+      "configUrl": "https://nos.netease.com/ysf/d7a21cf34ede56f5c686ecfba5fc7e3f.txt",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "初中课堂",
+      "name": "📚初中┃课堂",
+      "api": "csp_BiliGuard",
+      "kind": "data",
+      "configUrl": "https://nos.netease.com/ysf/8f55d520f8d70056695740ef151744a7.txt",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "高中教育",
+      "name": "📚高中┃课堂",
+      "api": "csp_BiliGuard",
+      "kind": "data",
+      "configUrl": "https://nos.netease.com/ysf/c66a4b5356141c49fd45ec51568017b4.txt",
+      "origin": "config.ext",
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "push_agent",
+      "name": "🛴手机┃推送",
+      "api": "csp_PushGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    },
+    {
+      "key": "cc",
+      "name": "请勿信视频中任何广告",
+      "api": "csp_XPathGuard",
+      "kind": "unknown",
+      "configUrl": null,
+      "origin": null,
+      "rule": null,
+      "discoveredHost": null
+    }
+  ]
+}

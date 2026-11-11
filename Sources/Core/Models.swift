@@ -9,25 +9,23 @@ public enum ViewerError: LocalizedError {
 }
 
 public enum SourceRuntime: String, Codable {
-    case jsonAPI, nativePort, android, javascript, unsupported
+    case plugin, jsonAPI, javascript, unsupported
 
     public var title: String {
         switch self {
+        case .plugin: return "本机插件解析"
         case .jsonAPI: return "JSON 接口"
-        case .nativePort: return "本机适配·实验"
-        case .android: return "通用试配"
-        case .javascript: return "脚本待适配"
-        case .unsupported: return "暂未适配"
+        case .javascript: return "脚本待支持"
+        case .unsupported: return "无法识别"
         }
     }
 
     public var explanation: String {
         switch self {
-        case .jsonAPI: return "可尝试在本机浏览。播放仍取决于接口是否返回 iOS 支持的媒体地址。"
-        case .nativePort: return "已为这个来源编写独立的 iOS 适配。应用直接请求对应网站，不执行 Android 爬虫；当前适配仍需要真机验证。"
-        case .android: return "使用通用网页 / JSON 规则尝试采集。可补充来源地址和规则；运行时会显示具体错误，不执行 Android 插件。"
-        case .javascript: return "这个源依赖 drpy 等宿主环境。当前版本尚未提供兼容的脚本引擎，无法直接搜索或解析。"
-        case .unsupported: return "当前版本尚未实现这个接口格式。"
+        case .plugin: return "在设备内静态解开配置指定的 spider 插件，取出站点域名与选择器后直接采集网页，不执行安卓代码。"
+        case .jsonAPI: return "直接读取配置里的 JSON 采集接口。"
+        case .javascript: return "这个来源是 drpy 等脚本源，当前版本没有脚本运行时。"
+        case .unsupported: return "配置条目里没有可识别为采集器或接口的地址。"
         }
     }
 }
@@ -35,7 +33,6 @@ public enum SourceRuntime: String, Codable {
 public struct SourceSite: Codable, Identifiable, Hashable {
     public var key: String
     public var name: String
-    public var type: Int
     public var api: String
     public var searchable: Bool
     public var extensionValue: String? = nil
@@ -43,45 +40,23 @@ public struct SourceSite: Codable, Identifiable, Hashable {
     public var id: String { key }
 
     public var runtime: SourceRuntime {
-        if genericRule != nil { return .android }
-        if nativeAdapter != nil { return .nativePort }
-        if api.lowercased().hasPrefix("csp_") { return .android }
+        if api.lowercased().hasPrefix("csp_") { return .plugin }
         if let url = HTTPAddress.optional(api), url.path.lowercased().hasSuffix(".js") { return .javascript }
-        if (type == 1 || type == 4), HTTPAddress.optional(api) != nil { return .jsonAPI }
+        if HTTPAddress.optional(api) != nil { return .jsonAPI }
         return .unsupported
     }
 
-    public var isNative: Bool { runtime == .jsonAPI || runtime == .nativePort || usesGenericAdapter }
-    public var usesGenericAdapter: Bool { genericRule != nil || (nativeAdapter == nil && api.lowercased().hasPrefix("csp_")) }
-
-    public var nativeAdapter: NativeSourceAdapter? {
-        NativeSourceAdapter.identify(type: type, api: api, extensionValue: extensionValue)
+    /// csp_AueteGuard → Auete
+    public var pluginClassName: String? {
+        let value = api.trimmingCharacters(in: .whitespaces)
+        guard value.lowercased().hasPrefix("csp_") else { return nil }
+        var name = String(value.dropFirst(4))
+        if name.hasSuffix("Guard") { name = String(name.dropLast(5)) }
+        return name.isEmpty ? nil : name
     }
-}
 
-public enum NativeSourceAdapter: String, Codable {
-    case tuxiaobei, dm84, bilibili, libvio, auete, firstAid
-
-    static func identify(type: Int, api: String, extensionValue: String?) -> NativeSourceAdapter? {
-        if type == 3 {
-            switch api {
-            case "csp_Dm84Guard", "csp_Dm84": return .dm84
-            case "csp_BiliGuard", "csp_Bili": return .bilibili
-            case "csp_LibvioGuard", "csp_Libvio": return .libvio
-            case "csp_AueteGuard", "csp_Auete": return .auete
-            case "csp_FirstAidGuard", "csp_FirstAid": return .firstAid
-            default: break
-            }
-        }
-        guard type == 3, let apiURL = HTTPAddress.optional(api),
-              apiURL.path.lowercased().hasSuffix(".js"),
-              let extensionValue, let url = HTTPAddress.optional(extensionValue) else { return nil }
-        let path = url.path.removingPercentEncoding ?? url.path
-        let knownPaths = ["/fantaiying7/EXT/refs/heads/main/兔小贝.js", "/fantaiying7/EXT/main/兔小贝.js"]
-        if url.host?.lowercased() == "raw.githubusercontent.com", knownPaths.contains(path) { return .tuxiaobei }
-        if url.host?.lowercased() == "ghproxy.net", knownPaths.contains(where: { path == "/https://raw.githubusercontent.com" + $0 }) { return .tuxiaobei }
-        return nil
-    }
+    public var isNative: Bool { runtime == .plugin || runtime == .jsonAPI }
+    public var isPlugin: Bool { runtime == .plugin }
 }
 
 public struct LiveSource: Codable, Identifiable, Hashable {
@@ -104,14 +79,12 @@ public struct SourceConfig: Codable {
     public var sourceURL: String
     public var nativeSites: [SourceSite] { sites.filter(\.isNative) }
 
-    /// A site's keyword search is shared by its category-specific Bili entries.
+    /// A site's keyword search is shared by duplicate entries pointing at the same collector.
     public var searchTargets: [SourceSearchTarget] {
         var groups: [SourceSearchTarget] = []
         var indexes: [String: Int] = [:]
         for site in nativeSites where site.searchable {
-            let key = site.usesGenericAdapter ? "generic:" + site.key : site.nativeAdapter.map {
-                "native:" + $0.rawValue + ($0 == .bilibili ? "" : "|" + (site.extensionValue ?? ""))
-            } ?? "api:\(site.type):\(site.api)"
+            let key = site.pluginClassName.map { "plugin:" + $0 } ?? "api:\(site.api)"
             if let index = indexes[key] { groups[index].aliases.append(site) }
             else {
                 indexes[key] = groups.count

@@ -26,10 +26,10 @@ public struct TVAPIClient {
         return try await loadPage(site: site, category: category, search: search, page: page)
     }
 
-    /// TVBox home separates the categories document from optional home videos.
+    /// TVBox home 把分类文档和首页内容分开发，插件源直接读首页。
     public func home(site: SourceSite) async throws -> VideoPage {
-        if site.nativeAdapter != nil || site.usesGenericAdapter { return try await loadPage(site: site, category: nil, search: nil, page: 1) }
-        let root = try await object(site: site, query: site.type == 4 ? ["filter": "true"] : [:])
+        if site.isPlugin { return try await loadPage(site: site, category: nil, search: nil, page: 1) }
+        let root = try await object(site: site, query: [:])
         let home = Self.decodePage(root, baseURL: try HTTPAddress.parse(site.api))
         if !home.videos.isEmpty { return home }
         let content = try await loadPage(site: site, category: home.categories.first?.id, search: nil, page: 1)
@@ -38,16 +38,8 @@ public struct TVAPIClient {
     }
 
     private func loadPage(site: SourceSite, category: String?, search: String?, page: Int) async throws -> VideoPage {
-        if site.usesGenericAdapter { return try await GenericSourceAdapter(site: site).page(category: category, search: search, page: page) }
-        if site.nativeAdapter == .firstAid { return try await FirstAidAdapter().page(category: category, search: search, page: page) }
-        if site.nativeAdapter == .auete { return try await AueteAdapter().page(category: category, search: search, page: page) }
-        if site.nativeAdapter == .tuxiaobei {
-            return try await TuxiaobeiAdapter().page(category: category, search: search, page: page)
-        }
-        if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).page(category: category, search: search, page: page) }
-        if site.nativeAdapter == .dm84 || site.nativeAdapter == .libvio { return try await HTMLSourceAdapter(site: site).page(category: category, search: search, page: page) }
+        if site.isPlugin { return try await GenericSourceAdapter(site: site).page(category: category, search: search, page: page) }
         var values = ["pg": String(page)]
-        if site.type == 1 { values["ac"] = "detail" }
         if let category, !category.isEmpty { values["t"] = category; values["ac"] = "detail" }
         if let search, !search.isEmpty { values["wd"] = search; values["ac"] = "detail" }
         let root = try await object(site: site, query: values)
@@ -55,12 +47,7 @@ public struct TVAPIClient {
     }
 
     public func detail(site: SourceSite, id: String) async throws -> Video {
-        if site.usesGenericAdapter { return try await GenericSourceAdapter(site: site).detail(id: id) }
-        if site.nativeAdapter == .firstAid { return try await FirstAidAdapter().detail(id: id) }
-        if site.nativeAdapter == .auete { return try await AueteAdapter().detail(id: id) }
-        if site.nativeAdapter == .tuxiaobei { return try await TuxiaobeiAdapter().detail(id: id) }
-        if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).detail(id: id) }
-        if site.nativeAdapter == .dm84 || site.nativeAdapter == .libvio { return try await HTMLSourceAdapter(site: site).detail(id: id) }
+        if site.isPlugin { return try await GenericSourceAdapter(site: site).detail(id: id) }
         let root = try await object(site: site, query: ["ac": "detail", "ids": id])
         let page = Self.decodePage(root, baseURL: try HTTPAddress.parse(site.api))
         guard let video = page.videos.first else { throw ViewerError.message("接口没有返回影片详情。") }
@@ -75,19 +62,11 @@ public struct TVAPIClient {
     }
 
     private func resolveLink(site: SourceSite, episode: Episode, flag: String, title: String) async throws -> MediaLink {
-        if site.usesGenericAdapter { return try await GenericSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
-        if site.nativeAdapter == .firstAid { return try FirstAidAdapter().resolve(episode: episode, title: title, group: site.name) }
-        if site.nativeAdapter == .auete { return try await AueteAdapter().resolve(episode: episode, title: title, group: site.name) }
-        if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).resolve(episode: episode, title: title) }
-        if site.nativeAdapter == .dm84 || site.nativeAdapter == .libvio { return try await HTMLSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
-        if site.nativeAdapter == .tuxiaobei {
-            guard HTTPAddress.isMedia(episode.value) else { throw ViewerError.message("这个来源没有返回可直接播放的媒体地址。") }
-            return MediaLink(title: title, url: episode.value, headers: TuxiaobeiAdapter.headers, group: site.name)
-        }
+        if site.isPlugin { return try await GenericSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }
         if HTTPAddress.isMedia(episode.value) {
             return MediaLink(title: title, url: episode.value, group: site.name)
         }
-        guard site.type == 4 else {
+        guard site.runtime == .jsonAPI else {
             let url = try HTTPAddress.parse(episode.value)
             return MediaLink(title: title, url: url.absoluteString, group: site.name, kind: .web)
         }

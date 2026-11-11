@@ -1,5 +1,13 @@
 # iMovie 任务恢复摘要
 
+## 最新 0.4.1 快速修复优先
+
+用户要求省 token 快速修复 7 项 bug。当前构建 `42977784403`，提交 `bb9ccbf487a53f9a7070a59e03d37414eee34451`，版本 0.4.1 / build 5。已编译核心通过，UI 运行中，最终状态见 validation / build-info。
+
+轮播改用当前源前 6 条并直接 NavigationLink 进详情，删除所有页面豆瓣请求和同名二次搜索。详情错误有验证入口。图片后台 ImageIO 缩图 + 解码缓存、限频目录清理。直播 URLSession 忽略证书 + AVAssetResourceLoader 认证委托；Kimentanm 直连 raw GitHub，尚未保证每个实际频道。MediaLink 持久化海报、M3U tvg-logo，收藏记录正方形图；旧无图记录占位。搜索 Tab 重新进入重置会话；源内 / 全局最多三词扩展去重排序。新 UI 测试轮播 ID 为 recommendation-1，截图 25-site-carousel。规则及原有通用 CSP 开放保留。
+
+最新说明 `docs/hotfix-0.4.1.md`。打包器 / review_delivery.py 已改为 0.4.1，必须下载最新 evidence，更新最终测试结果后 upload（仅 docs），package_delivery.py 再 review_delivery.py --verify。下面 0.4.0 豆瓣段落为历史。
+
 更新：2026-11-11，Asia/Shanghai。继续时优先读取本文、当前源码和 `dist/build-info.json`，无需重新导入旧聊天或原始大图。
 
 ## 用户要求和执行偏好

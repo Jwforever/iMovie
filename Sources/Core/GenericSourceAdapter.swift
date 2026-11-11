@@ -1,7 +1,10 @@
 import Foundation
 import SwiftSoup
 
-/// Data-only rules can be updated in a configuration or local override without a new IPA.
+/// 数据驱动的采集规则。规则来源只有两个：
+/// 1. 配置条目自带的 ios / iMovie 规则；
+/// 2. 现场从配置指定的 spider 插件里静态解出来的规则。
+/// 代码里不保存任何站点域名或站点专用路径。
 public struct GenericSourceRule: Codable, Hashable {
     public var baseURL: String
     public var mode: String? = nil // auto / html / json
@@ -23,8 +26,6 @@ public struct GenericSourceRule: Codable, Hashable {
     public init(baseURL: String) { self.baseURL = baseURL }
 }
 
-/// Shared Auete/MacCMS/JSON catalog pipeline for all remaining CSP entries.
-/// This is an attempted local adapter, not an Android bytecode runtime.
 public struct GenericSourceAdapter {
     public let site: SourceSite
     private let http = HTTPClient()
@@ -43,35 +44,30 @@ public struct GenericSourceAdapter {
         return try? JSONDecoder().decode(GenericSourceRule.self, from: data)
     }
 
+    /// 规则解析顺序：配置自带 → JSON 接口 → 从插件静态解出。
     public func rule() async throws -> GenericSourceRule {
-        if let rule = site.genericRule { _ = try HTTPAddress.parse(rule.baseURL); return rule }
+        if let rule = site.genericRule, HTTPAddress.optional(rule.baseURL) != nil { return rule }
         if let ext = site.extensionValue {
             if let rule = Self.embeddedRule(ext) { return rule }
-            if let data = Data(base64Encoded: ext), let text = String(data: data, encoding: .utf8), let rule = Self.embeddedRule(text) { return rule }
-            if let url = HTTPAddress.optional(ext) {
-                if url.pathExtension.lowercased() == "json" {
-                    let (data, _) = try await http.data(from: url, cacheLifetime: 180)
-                    if let root = try? JSONSerialization.jsonObject(with: data), let rule = Self.embeddedRule(root) { return rule }
-                    throw ViewerError.message("已读取来源配置，但未找到站点 baseURL / siteUrl。可在来源规则中补充。")
-                }
-                if !["js", "jar"].contains(url.pathExtension.lowercased()) { return GenericSourceRule(baseURL: url.absoluteString) }
-            }
-            if let regex = try? NSRegularExpression(pattern: #"https?://[^\s\"'<>|]+"#),
-               let match = regex.firstMatch(in: ext, range: NSRange(ext.startIndex..., in: ext)),
-               let range = Range(match.range, in: ext), let url = HTTPAddress.optional(String(ext[range])),
-               !["js", "jar", "json"].contains(url.pathExtension.lowercased()) {
-                return GenericSourceRule(baseURL: url.absoluteString)
-            }
+            if let data = Data(base64Encoded: ext), let text = String(data: data, encoding: .utf8),
+               let rule = Self.embeddedRule(text) { return rule }
         }
-        if let url = HTTPAddress.optional(site.api), !["js", "jar"].contains(url.pathExtension.lowercased()) { return GenericSourceRule(baseURL: url.absoluteString) }
-        // Only verified public entry points; no fabricated domains derived from display names.
-        let known = ["csp_NewCzGuard": "https://www.cz4k.com/", "csp_SixVGuard": "https://www.xb6v.com/"]
-        if let base = known[site.api] { return GenericSourceRule(baseURL: base) }
-        throw ViewerError.message("已尝试通用适配：\(site.api) 没有提供可读取的网站地址。Android 类名或加固参数不能转换成域名；请在“来源规则”填写官网 / JSON 接口，或导入含 ios 规则的新配置。")
+        switch site.runtime {
+        case .jsonAPI:
+            if let url = HTTPAddress.optional(site.api) { return GenericSourceRule(baseURL: url.absoluteString) }
+            throw ViewerError.message("这个来源的接口地址无效。")
+        case .javascript:
+            throw ViewerError.message("这是 drpy 等脚本源，当前版本没有脚本运行时，无法直接采集。")
+        case .unsupported:
+            throw ViewerError.message("配置条目里没有可识别为采集器或接口的地址。")
+        case .plugin:
+            return try await GuardRuleCatalog.shared.rule(api: site.api, ext: site.extensionValue,
+                                                          spider: SpiderSource.shared.url)
+        }
     }
 
     private func headers(_ rule: GenericSourceRule) -> [String: String] {
-        var headers = ["User-Agent": HTMLSourceAdapter.userAgent, "Referer": rule.baseURL]
+        var headers = ["User-Agent": BrowserProfile.userAgent, "Referer": rule.baseURL]
         rule.headers?.forEach { headers[$0.key] = $0.value }
         return headers
     }
@@ -90,10 +86,7 @@ public struct GenericSourceAdapter {
             if let category, !category.isEmpty { query["t"] = category }
             urls = [try Self.queryURL(origin, values: query)]
         } else if !term.isEmpty {
-            urls = [try Self.expand("/auete4so.php?searchword={query}&page={page}", base: origin, query: term, page: page),
-                        try Self.expand("/vodsearch/-------------.html?wd={query}", base: origin, query: term, page: page),
-                        try Self.expand("/index.php/vod/search.html?wd={query}", base: origin, query: term, page: page),
-                        try Self.expand("/s----------.html?wd={query}", base: origin, query: term, page: page)]
+            throw ViewerError.message("这个来源没有解出搜索地址。可在“来源规则”里补一条带 {query} 的搜索模板。")
         } else if let category, !category.isEmpty {
             let template = rule.categoryURL ?? "{category}"
             urls = [try Self.expand(template, base: origin, page: page, category: category)]
@@ -107,9 +100,8 @@ public struct GenericSourceAdapter {
                 if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any], root["list"] != nil {
                     return TVAPIClient.decodePage(root, baseURL: final)
                 }
-                // When a rule has no page placeholder, follow the site's actual next links.
-                // Catalog responses are cached, so previous pages do not need fresh downloads.
-                if page > 1 && !(explicitTemplate?.contains("{page}") ?? (!term.isEmpty && url.path.contains("auete4so"))) {
+                // 规则没有页码占位时，按站点自己的“下一页”链接翻页。
+                if page > 1 && !(explicitTemplate?.contains("{page}") ?? false) {
                     var visited = Set([final.absoluteString])
                     guard page <= 50 else { throw ViewerError.message("通用分页超过 50 页，请设置含 {page} 的地址模板。") }
                     for _ in 1..<page {
@@ -126,7 +118,7 @@ public struct GenericSourceAdapter {
             catch { lastError = error }
         }
         if let lastError { throw lastError }
-        throw ViewerError.message("已尝试通用奥特 / MacCMS 采集规则，没有读到匹配内容。可在来源规则中设置搜索地址和 CSS 选择器。")
+        throw ViewerError.message("已按解出的规则请求来源，没有读到匹配内容。可在来源规则里调整选择器。")
     }
 
     public func detail(id: String) async throws -> Video {
@@ -174,14 +166,14 @@ public struct GenericSourceAdapter {
             if !name.isEmpty && name.count < 15 { categories.append(VideoCategory(id: url.absoluteString, name: name)) }
         }
         let next = try nextPageURL(data, baseURL: baseURL) != nil
-        if videos.isEmpty && categories.isEmpty { throw ViewerError.message("已连接来源，但通用规则没有识别出影片。可修改列表 / 标题选择器，或检查站点验证提示。") }
+        if videos.isEmpty && categories.isEmpty { throw ViewerError.message("已连接来源，但规则没有识别出影片。可修改列表 / 标题选择器，或检查站点验证提示。") }
         return VideoPage(categories: categories, videos: videos, page: max(1, page), pageCount: next ? max(1, page) + 1 : max(1, page))
     }
 
     static func decodeDetail(_ data: Data, baseURL: URL, rule: GenericSourceRule, id: String) throws -> Video {
         let doc = try document(data, base: baseURL)
         let title = try doc.select(rule.detailTitleSelector ?? "h1.detail-title,h1.v_title,.stui-content__detail h1,.myui-content__detail h1,.module-info-heading h1,h1").first()?.text() ?? ""
-        guard !title.isEmpty else { throw ViewerError.message("通用规则未识别到影片标题，请设置详情标题选择器。") }
+        guard !title.isEmpty else { throw ViewerError.message("规则未识别到影片标题，请设置详情标题选择器。") }
         let lists = try doc.select(rule.lineSelector ?? "ul.episode-list,ul.play_list,ul.stui-content__playlist,ul.myui-content__playlist,.module-play-list,.play-list,.anthology-list-play,.playlist").array()
         var names: [String] = [], blocks: [String] = []
         let containers = lists.isEmpty ? [doc.body()].compactMap { $0 } : lists
@@ -195,7 +187,7 @@ public struct GenericSourceAdapter {
             }
             if !episodes.isEmpty { names.append("线路 \(index + 1)"); blocks.append(episodes.joined(separator: "#")) }
         }
-        guard !blocks.isEmpty else { throw ViewerError.message("已读取详情，但通用规则未找到选集。可设置选集 / 线路选择器；网盘、登录或磁力线路需要相应规则。") }
+        guard !blocks.isEmpty else { throw ViewerError.message("已读取详情，但没有找到选集。可设置选集 / 线路选择器；网盘、登录或磁力线路需要相应规则。") }
         let image = try doc.select(rule.posterSelector ?? ".detail-poster img,.stui-content__thumb img,.myui-content__thumb img,.module-info-poster img,meta[property=og:image]").first()
         let summary = try doc.select(rule.summarySelector ?? ".detail-info-body,.detail-content,.module-info-introduction,.vod_content,.content_desc,[property=og:description]").text()
         return Video(id: id, title: title, poster: try imageURL(image, fallback: nil, base: baseURL), note: "", summary: summary, playFrom: names.joined(separator: "$$$"), playURL: blocks.joined(separator: "$$$"))
@@ -237,6 +229,7 @@ public struct GenericSourceAdapter {
     static func expand(_ template: String, base: URL, query: String = "", page: Int = 1, category: String = "", id: String = "") throws -> URL {
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+#=?"))) ?? query
         let value = template.replacingOccurrences(of: "{query}", with: encodedQuery).replacingOccurrences(of: "{page}", with: String(max(1, page)))
+            .replacingOccurrences(of: "{wd}", with: encodedQuery)
             .replacingOccurrences(of: "{category}", with: category).replacingOccurrences(of: "{id}", with: id)
             .replacingOccurrences(of: "{url}", with: id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+#=?"))) ?? id)
         return try HTTPAddress.parse(value, relativeTo: base)

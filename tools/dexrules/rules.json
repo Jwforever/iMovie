@@ -1,0 +1,48 @@
+[
+ {
+  "key": "Auete",
+  "name": "Auete",
+  "baseURL": "https://www.au1080.top",
+  "mode": "html",
+  "listSelector": "ul.threadlist li",
+  "titleSelector": "h2 a@title",
+  "posterSelector": "a.pic img@src",
+  "noteSelector": "span.hdtag",
+  "linkSelector": "h2 a@href",
+  "searchURL": "auete4so.php?searchword={wd}&page={pg}",
+  "detailTitleSelector": "h1.detail-title",
+  "summarySelector": "div.message p.detail-des",
+  "episodeSelector": "ul.episode-list li > a",
+  "lineSelector": "div.card-header span b",
+  "playerURL": ""
+ },
+ {
+  "key": "Dm84",
+  "name": "Dm84",
+  "baseURL": "http://dmbus.cc",
+  "mode": "html",
+  "listSelector": "div.item",
+  "titleSelector": "a.title",
+  "noteSelector": "span.desc",
+  "linkSelector": "a.title@href",
+  "categoryURL": "/show-%s--%s-%s--%s-%s.html",
+  "searchURL": "/s----------.html?wd={wd}{pg}",
+  "detailTitleSelector": "h1.v_title",
+  "summarySelector": "p.v_desc > span.desc",
+  "episodeSelector": "ul.play_list",
+  "lineSelector": "ul.tab_control > li",
+  "playerURL": ""
+ },
+ {
+  "key": "FirstAid",
+  "name": "FirstAid",
+  "baseURL": "https://m.youlai.cn",
+  "mode": "html",
+  "listSelector": ".list-br3",
+  "linkSelector": "a@href",
+  "searchURL": "/cse/search?q=",
+  "detailTitleSelector": ".video-title.h1-title",
+  "posterSelector": ".video-cover.list-flex-in img@src",
+  "playerURL": ""
+ }
+]

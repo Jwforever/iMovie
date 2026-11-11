@@ -3,12 +3,12 @@ import XCTest
 @testable import iMovieCore
 
 final class GenericSourceTests: XCTestCase {
-    func testAllUnknownAndroidSourcesRemainOpenAndSeparateInSearch() throws {
+    func testAllPluginSourcesStayOpenAndSeparateInSearch() throws {
         let config = try ConfigDecoder.decode(Data(#"{"sites":[{"key":"new-a","type":3,"api":"csp_NewUnknownGuard"},{"key":"new-b","type":3,"api":"csp_NewUnknownGuard"}]}"#.utf8), sourceURL: URL(string: "https://example.test/config")!)
         XCTAssertEqual(config.nativeSites.count, 2)
-        XCTAssertTrue(config.sites.allSatisfy(\.usesGenericAdapter))
+        XCTAssertTrue(config.sites.allSatisfy(\.isPlugin))
         XCTAssertEqual(config.searchTargets.count, 2)
-        XCTAssertEqual(config.sites[0].runtime.title, "通用试配")
+        XCTAssertEqual(config.sites[0].runtime.title, "本机插件解析")
     }
 
     func testFutureSourceRuleDecodesWithoutNewNativeAdapter() throws {
@@ -32,13 +32,13 @@ final class GenericSourceTests: XCTestCase {
         XCTAssertEqual(video.lines[0].episodes[0].value, "https://example.test/play/1.html")
     }
 
-    func testMissingDomainReportsSpecificErrorWhileStillOpen() async throws {
-        let site = SourceSite(key: "x", name: "未知", type: 3, api: "csp_EncryptedGuard", searchable: true, extensionValue: "deadbeef")
+    func testPluginSiteWithoutPluginURLReportsSpecificError() async throws {
+        let site = SourceSite(key: "x", name: "未知", api: "csp_EncryptedGuard", searchable: true, extensionValue: "deadbeef")
         XCTAssertTrue(site.isNative)
         do {
             _ = try await GenericSourceAdapter(site: site).rule()
-            XCTFail("Class identifiers cannot invent domains")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("没有提供")) }
+            XCTFail("没有插件地址时不应凭空生成域名")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("插件")) }
     }
 
     func testGenericPaginationFollowsActualSameSiteLinks() throws {
