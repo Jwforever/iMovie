@@ -133,14 +133,14 @@ final class PlaybackUITests: XCTestCase {
         source.tap()
         let query = app.textFields["site-search-query"]
         XCTAssertTrue(query.waitForExistence(timeout: 10))
-        let video = app.staticTexts["折月亮"].firstMatch
+        let video = app.buttons["video-card-/Tv/neidi/zheyueliang/"]
+        XCTAssertTrue(video.waitForExistence(timeout: 30))
         for _ in 0..<4 {
-            if video.exists && video.isHittable && video.frame.maxY < app.frame.height - 130 { break }
+            if video.isHittable && video.frame.minY > 180 && video.frame.maxY < app.frame.height - 90 { break }
             app.swipeUp()
         }
-        XCTAssertTrue(video.waitForExistence(timeout: 35))
         capture("15-auete-home")
-        app.buttons["video-card-/Tv/neidi/zheyueliang/"].tap()
+        video.tap()
         XCTAssertTrue(app.buttons["第1集"].firstMatch.waitForExistence(timeout: 30))
         capture("16-auete-episodes")
         app.buttons["第1集"].firstMatch.tap()
