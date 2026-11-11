@@ -30,7 +30,7 @@ public struct HTTPClient {
             throw ViewerError.message("接口返回 HTTP \(status)。请稍后重试或检查地址。")
         }
         guard data.count <= ConfigDecoder.maximumBytes else { throw ViewerError.message("接口响应超过 8 MB。") }
-        return (data, response.url ?? url)
+        return (data, response.url ?? request.url!)
     }
 
     private func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {

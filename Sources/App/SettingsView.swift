@@ -2,6 +2,8 @@ import SwiftUI
 
 @MainActor struct SettingsView: View {
     @EnvironmentObject private var store: AppStore
+    @State private var cacheBytes = 0
+    @State private var clearingCache = false
 
     var body: some View {
         Form {
@@ -38,6 +40,19 @@ import SwiftUI
                 Text("支持 AVPlayer 可解码的格式，通常包括 HLS、MP4。部分 TS、MKV、网页链接及特殊音视频编码需要额外适配。")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("缓存") {
+                LabeledContent("图片磁盘缓存", value: ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file))
+                Button(clearingCache ? "正在清理…" : "清理图片缓存") {
+                    clearingCache = true
+                    Task {
+                        await ImageCache.shared.clear()
+                        cacheBytes = await ImageCache.shared.diskBytes()
+                        clearingCache = false
+                    }
+                }.disabled(clearingCache).accessibilityIdentifier("clear-image-cache")
+                Text("海报和推荐图片共享内存与磁盘缓存，最多 120 MB，14 天后更新。清理不会删除收藏或播放记录。播放地址会按需重新获取。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("iMovie") {
                 Text("收藏和播放记录保存在本机。配置和媒体由你提供，应用不附带影片库。")
                     .font(.subheadline).foregroundStyle(.secondary)
@@ -52,6 +67,7 @@ import SwiftUI
         }
         .scrollContentBackground(.hidden).background(Theme.backdrop)
         .navigationTitle("设置")
+        .task { cacheBytes = await ImageCache.shared.diskBytes() }
     }
 
     private static var notices: String {

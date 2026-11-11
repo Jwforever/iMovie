@@ -393,9 +393,7 @@ import SwiftUI
         Color.clear.frame(height: 215)
             .background(Theme.panel)
             .overlay(alignment: .trailing) {
-                AsyncImage(url: HTTPAddress.optional(video.poster)) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: { Image(systemName: "film.stack").font(.system(size: 90)).foregroundStyle(Theme.accent.opacity(0.15)) }
+                CachedPosterImage(url: HTTPAddress.optional(video.poster))
                     .frame(width: 185, height: 215).clipped().allowsHitTesting(false).accessibilityHidden(true)
             }
             .overlay {
@@ -445,9 +443,7 @@ import SwiftUI
         Color.clear.aspectRatio(2.0 / 3.0, contentMode: .fit)
             .overlay {
                 GeometryReader { geometry in
-                    AsyncImage(url: HTTPAddress.optional(url)) { image in image.resizable().scaledToFill() } placeholder: {
-                        ZStack { Theme.panel; Image(systemName: "film").font(.largeTitle).foregroundStyle(.tertiary) }
-                    }
+                    CachedPosterImage(url: HTTPAddress.optional(url))
                     .frame(width: geometry.size.width, height: geometry.size.height).clipped()
                 }
                 .accessibilityHidden(true)
