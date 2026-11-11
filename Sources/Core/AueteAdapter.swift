@@ -17,7 +17,7 @@ public struct AueteAdapter {
 
     public func page(category: String?, search: String?, page: Int) async throws -> VideoPage {
         let url = try Self.pageURL(category: category, search: search, page: page)
-        let (data, final) = try await http.data(from: url, headers: Self.headers)
+        let (data, final) = try await http.data(from: url, headers: Self.headers, cacheLifetime: search?.isEmpty != false ? 180 : 0)
         return try Self.decodePage(data, baseURL: final, page: max(1, page))
     }
 

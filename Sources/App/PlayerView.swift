@@ -20,13 +20,17 @@ final class PlaybackController: ObservableObject {
     private var resolutionTask: Task<Void, Never>?
     private var generation = UUID()
     private var shouldPlay = false
+    private var lastRecordedAt = Date.distantPast
 
     init() {
         progressObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] time in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.elapsed = time.seconds.isFinite ? max(0, time.seconds) : 0
-                if let media = self.media { self.onProgress?(media, self.position) }
+                if let media = self.media, Date().timeIntervalSince(self.lastRecordedAt) >= 5 {
+                    self.lastRecordedAt = Date()
+                    self.onProgress?(media, self.position)
+                }
             }
         }
     }
@@ -100,6 +104,7 @@ final class PlaybackController: ObservableObject {
             player.replaceCurrentItem(with: item)
             player.allowsExternalPlayback = true
             onProgress?(media, resume)
+            lastRecordedAt = Date()
             timeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] _, _ in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
@@ -158,9 +163,10 @@ final class PlaybackController: ObservableObject {
 
     func makeCoordinator() -> Coordinator { Coordinator(playback: playback) }
 
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = PersistentPlayerViewController()
-        controller.playback = playback
+    func makeUIViewController(context: Context) -> PlayerContainerViewController {
+        let container = PlayerContainerViewController()
+        container.playback = playback
+        let controller = container.videoController
         controller.player = playback.player
         controller.allowsPictureInPicturePlayback = true
         controller.canStartPictureInPictureAutomaticallyFromInline = true
@@ -172,10 +178,11 @@ final class PlaybackController: ObservableObject {
             let ready = controller.isReadyForDisplay
             Task { @MainActor in playback?.rendered(ready) }
         }
-        return controller
+        return container
     }
 
-    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
+    func updateUIViewController(_ container: PlayerContainerViewController, context: Context) {
+        let controller = container.videoController
         if controller.player !== playback.player { controller.player = playback.player }
     }
 
@@ -193,8 +200,26 @@ final class PlaybackController: ObservableObject {
     }
 }
 
-@MainActor private final class PersistentPlayerViewController: AVPlayerViewController {
+/// AVPlayerViewController is embedded as a child; Apple does not support subclassing it.
+@MainActor final class PlayerContainerViewController: UIViewController {
     weak var playback: PlaybackController?
+    let videoController = AVPlayerViewController()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        addChild(videoController)
+        videoController.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(videoController.view)
+        NSLayoutConstraint.activate([
+            videoController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            videoController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            videoController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            videoController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        videoController.didMove(toParent: self)
+    }
+
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         let playing = playback?.isPlaying == true
         super.viewWillTransition(to: size, with: coordinator)

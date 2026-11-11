@@ -37,7 +37,7 @@ public struct HTMLSourceAdapter {
         } else if requested > 1 {
             components.path = adapter == .dm84 ? "/show-1--time----\(requested).html" : "/show/1--time------\(requested)---.html"
         }
-        let (data, finalURL) = try await http.data(from: components.url!, headers: headers)
+        let (data, finalURL) = try await http.data(from: components.url!, headers: headers, cacheLifetime: query.isEmpty ? 180 : 0)
         if adapter == .libvio && !query.isEmpty {
             guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw ViewerError.message("搜索接口没有返回 JSON。") }
             let list = (root["list"] as? [[String: Any]] ?? []).map { row in

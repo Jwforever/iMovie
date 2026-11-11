@@ -6,11 +6,16 @@ import FoundationNetworking
 public struct HTTPClient {
     public init() {}
 
-    public func data(from url: URL, headers: [String: String] = [:]) async throws -> (Data, URL) {
+    public func data(from url: URL, headers: [String: String] = [:], cacheLifetime: TimeInterval = 0) async throws -> (Data, URL) {
         var request = URLRequest(url: url, timeoutInterval: 25)
         request.setValue("okhttp/4.12.0", forHTTPHeaderField: "User-Agent")
         request.setValue("application/json,text/plain,*/*", forHTTPHeaderField: "Accept")
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        if cacheLifetime > 0 {
+            let key = url.absoluteString + "|" + headers.sorted { $0.key < $1.key }.map { $0.key + ":" + $0.value }.joined(separator: "|")
+            let cachedRequest = request
+            return try await CatalogCache.shared.data(key: key, lifetime: cacheLifetime) { try await data(for: cachedRequest) }
+        }
         return try await data(for: request)
     }
 

@@ -106,7 +106,9 @@ public struct SourceConfig: Codable {
         var groups: [SourceSearchTarget] = []
         var indexes: [String: Int] = [:]
         for site in nativeSites where site.searchable {
-            let key = site.nativeAdapter.map { "native:" + $0.rawValue } ?? "api:\(site.type):\(site.api)"
+            let key = site.nativeAdapter.map {
+                "native:" + $0.rawValue + ($0 == .bilibili ? "" : "|" + (site.extensionValue ?? ""))
+            } ?? "api:\(site.type):\(site.api)"
             if let index = indexes[key] { groups[index].aliases.append(site) }
             else {
                 indexes[key] = groups.count

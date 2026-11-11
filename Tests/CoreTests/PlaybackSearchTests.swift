@@ -51,4 +51,27 @@ final class PlaybackSearchTests: XCTestCase {
         XCTAssertEqual(detail.lines.first?.episodes.first?.value, "https://vod.youlai.cn/sample.mp4")
         XCTAssertEqual(SourceSite(key: "Aid", name: "急救", type: 3, api: "csp_FirstAidGuard", searchable: true).nativeAdapter, .firstAid)
     }
+
+    func testCatalogCachePersistsAndClearingForcesReload() async throws {
+        actor Counter {
+            var count = 0
+            func load() -> (Data, URL) {
+                count += 1
+                return (Data("catalog".utf8), URL(string: "https://example.test/catalog")!)
+            }
+        }
+        let counter = Counter(), key = UUID().uuidString
+        let cache = CatalogCache()
+        _ = try await cache.data(key: key, lifetime: 60) { await counter.load() }
+        _ = try await cache.data(key: key, lifetime: 60) { await counter.load() }
+        let restarted = CatalogCache()
+        _ = try await restarted.data(key: key, lifetime: 60) { await counter.load() }
+        let first = await counter.count
+        XCTAssertEqual(first, 1)
+        await restarted.clear()
+        _ = try await restarted.data(key: key, lifetime: 60) { await counter.load() }
+        let second = await counter.count
+        XCTAssertEqual(second, 2)
+        await restarted.clear()
+    }
 }

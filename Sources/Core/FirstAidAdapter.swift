@@ -12,7 +12,7 @@ public struct FirstAidAdapter {
 
     public func page(category: String?, search: String?, page: Int) async throws -> VideoPage {
         // The current search endpoint returns no video catalog. Filter the public index locally.
-        let (data, _) = try await http.data(from: Self.origin.appendingPathComponent("jijiu/"), headers: headers)
+        let (data, _) = try await http.data(from: Self.origin.appendingPathComponent("jijiu/"), headers: headers, cacheLifetime: 180)
         return try Self.decodePage(data, category: category, search: search)
     }
 

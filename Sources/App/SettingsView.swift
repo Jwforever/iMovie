@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor struct SettingsView: View {
     @EnvironmentObject private var store: AppStore
     @State private var cacheBytes = 0
+    @State private var catalogBytes = 0
     @State private var clearingCache = false
 
     var body: some View {
@@ -42,15 +43,18 @@ import SwiftUI
             }
             Section("缓存") {
                 LabeledContent("图片磁盘缓存", value: ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file))
-                Button(clearingCache ? "正在清理…" : "清理图片缓存") {
+                LabeledContent("片库与推荐缓存", value: ByteCountFormatter.string(fromByteCount: Int64(catalogBytes), countStyle: .file))
+                Button(clearingCache ? "正在清理…" : "清理缓存") {
                     clearingCache = true
                     Task {
                         await ImageCache.shared.clear()
+                        await CatalogCache.shared.clear()
                         cacheBytes = await ImageCache.shared.diskBytes()
+                        catalogBytes = await CatalogCache.shared.diskBytes()
                         clearingCache = false
                     }
                 }.disabled(clearingCache).accessibilityIdentifier("clear-image-cache")
-                Text("海报和推荐图片共享内存与磁盘缓存，最多 120 MB，14 天后更新。清理不会删除收藏或播放记录。播放地址会按需重新获取。")
+                Text("图片缓存最多 120 MB，14 天更新；片库缓存 3 分钟，豆瓣推荐缓存 6 小时，合计最多 16 MB。搜索、配置导入和播放取址实时请求。清理不会删除收藏或播放记录。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("iMovie") {
@@ -67,7 +71,10 @@ import SwiftUI
         }
         .scrollContentBackground(.hidden).background(Theme.backdrop)
         .navigationTitle("设置")
-        .task { cacheBytes = await ImageCache.shared.diskBytes() }
+        .task {
+            cacheBytes = await ImageCache.shared.diskBytes()
+            catalogBytes = await CatalogCache.shared.diskBytes()
+        }
     }
 
     private static var notices: String {

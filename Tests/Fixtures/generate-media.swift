@@ -4,7 +4,7 @@ import Foundation
 
 let output = URL(fileURLWithPath: CommandLine.arguments[1])
 let writer = try AVAssetWriter(outputURL: output, fileType: .mp4)
-let width = 320, height = 180, frameCount = 900
+let width = 320, height = 180, frameCount = 1800
 let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
     AVVideoCodecKey: AVVideoCodecType.h264,
     AVVideoWidthKey: width,
@@ -47,4 +47,4 @@ input.markAsFinished()
 let finished = DispatchSemaphore(value: 0)
 writer.finishWriting { finished.signal() }
 guard finished.wait(timeout: .now() + 30) == .success, writer.status == .completed else { fatalError("Unable to finish test video") }
-print("Generated 30-second H.264 test video")
+print("Generated 60-second H.264 test video")
