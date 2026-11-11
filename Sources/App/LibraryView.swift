@@ -196,7 +196,7 @@ import SwiftUI
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 20) {
                             ForEach(videos) { video in
                                 NavigationLink { VideoDetailView(site: site, video: video) } label: { VideoPosterCard(video: video) }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.plain).accessibilityIdentifier("video-card-\(video.id)")
                             }
                         }
                         if loading { ProgressView().frame(maxWidth: .infinity).padding(25) }
@@ -324,7 +324,7 @@ import SwiftUI
                 AsyncImage(url: HTTPAddress.optional(video.poster)) { image in
                     image.resizable().scaledToFill()
                 } placeholder: { Image(systemName: "film.stack").font(.system(size: 90)).foregroundStyle(Theme.accent.opacity(0.15)) }
-                    .frame(width: 185, height: 250).clipped()
+                    .frame(width: 185, height: 215).clipped().allowsHitTesting(false).accessibilityHidden(true)
             }
             .overlay {
                 LinearGradient(colors: [Theme.panel, Theme.panel.opacity(0.88), Theme.panel.opacity(0.05)], startPoint: .leading, endPoint: .trailing)
@@ -369,9 +369,13 @@ import SwiftUI
     var body: some View {
         Color.clear.aspectRatio(2.0 / 3.0, contentMode: .fit)
             .overlay {
-                AsyncImage(url: HTTPAddress.optional(url)) { image in image.resizable().scaledToFill() } placeholder: {
-                    ZStack { Theme.panel; Image(systemName: "film").font(.largeTitle).foregroundStyle(.tertiary) }
+                GeometryReader { geometry in
+                    AsyncImage(url: HTTPAddress.optional(url)) { image in image.resizable().scaledToFill() } placeholder: {
+                        ZStack { Theme.panel; Image(systemName: "film").font(.largeTitle).foregroundStyle(.tertiary) }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height).clipped()
                 }
+                .allowsHitTesting(false).accessibilityHidden(true)
             }
             .clipShape(RoundedRectangle(cornerRadius: 14))
     }

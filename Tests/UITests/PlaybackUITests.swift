@@ -47,7 +47,9 @@ final class PlaybackUITests: XCTestCase {
 
     func testWebPageFindsMediaAndOpensSystemPlayer() throws {
         app.buttons["home-open-link"].tap()
-        app.switches["library-web-mode"].tap()
+        let webMode = app.switches["library-web-mode"]
+        webMode.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        XCTAssertEqual(webMode.value as? String, "1")
         let address = app.textFields["library-direct-url"]
         address.tap()
         address.typeText("http://127.0.0.1:8765/web\n")
@@ -138,7 +140,7 @@ final class PlaybackUITests: XCTestCase {
         }
         XCTAssertTrue(video.waitForExistence(timeout: 35))
         capture("15-auete-home")
-        video.tap()
+        app.buttons["video-card-/Tv/neidi/zheyueliang/"].tap()
         XCTAssertTrue(app.buttons["第1集"].firstMatch.waitForExistence(timeout: 30))
         capture("16-auete-episodes")
         app.buttons["第1集"].firstMatch.tap()

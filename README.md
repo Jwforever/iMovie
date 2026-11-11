@@ -1,4 +1,6 @@
-# iMovie 0.2.0 · iOS 私人播放器
+# iMovie 0.3.0 · iOS 私人播放器
+
+0.3.0 参考 TVBox / OK 影视的首页组织，增加记忆选源、顶部分类、推荐卡片、海报网格及最近播放；全局搜索按站点合并重复分类条目、持续并发查询和单源重试。新增奥特影视当前网站的 Swift 适配及用户手动完成网站验证的入口。实现参考见 [源码核查记录](docs/tvbox-reference.md)，最终测试结果见 [验证记录](docs/validation.md)。
 
 原生 SwiftUI iPhone / iPad 应用，支持 iOS 16 及以上。已用 Xcode 16.4 编译 arm64 真机版本并生成未签名 IPA，可用自己的证书重新签名安装。
 
@@ -8,9 +10,9 @@
 
 ## 安装和第一次使用
 
-1. 使用自己的签名工具重新签名 `dist/iMovie-0.2.0-unsigned.ipa`，再安装到 iPhone。
+1. 使用自己的签名工具重新签名 `dist/iMovie-0.3.0-unsigned.ipa`，再安装到 iPhone。
 2. 打开「设置」，默认已填入 `http://www.饭太硬.cc/tv`，点击「导入 / 更新配置」。
-3. 到「片库」选择标记为「本机适配·实验」的来源。已实测的「🚌巴士┃动漫」可以搜索、选集。
+3. 回到「首页」，点击左上角选择点播源；选择结果会保留。默认首页展示推荐内容，上方可切换分类。
 4. 播放页出现「已找到媒体地址」后，点击「系统播放」。也可以使用网页本身的播放器。
 5. 「搜索」可同时查询已适配且允许搜索的来源；「我的」保存收藏和播放记录。
 
@@ -26,12 +28,13 @@
 | B站公开内容 | 1 套本机适配对应配置中 7 个 Bili 条目；分类关键词、搜索、分 P、公开视频单文件 MP4；电脑端公开 API 和媒体 Range 请求通过，尚未完成 iOS 端该源的播放验证 |
 | 儿童 / 启蒙（兔小贝） | 独立 Swift 适配；分类、搜索、详情和公开 MP4 网络链路通过，尚未完成 iOS 端该源的播放验证 |
 | 立播 / Libvio | 实验性 HTML 适配；当前站点访问受限，未验证完整浏览与播放 |
-| 其余 36 个 Android 条目 | 显示「待移植」，当前不能搜索或播放 |
+| 奥特 / Auete | 0.3.0 新增当前网站分类、海报、详情选集和公开 HLS 识别；搜索要求网站验证码时可在应用内手动验证；最终回归见验证记录 |
+| 其余 35 个 Android 条目 | 显示「待移植」，当前不能搜索或播放 |
 | 虎牙 / 斗鱼 drpy 条目 | 显示「脚本待适配」，没有完整 drpy 宿主 |
 | JSON 类型 1 / 4 | 可接入返回公开媒体地址的接口；分类、搜索、分页、详情、选集；本地测试配置完整流程通过。用户原配置没有这类源 |
 | 直播 | M3U / TXT / HLS 列表；6 个配置列表中 1 个依赖 Android localhost 代理，明确标为不可用；其余频道未逐一验证 |
 
-设置中「本机移植（实验）10」表示 4 套适配识别到的 10 个配置条目，**不表示 10 个独立站点都已实测可用**。来源和媒体可用性会随网络、地区、网站结构及接口限制变化。
+设置中「本机移植（实验）11」表示 5 套适配识别到的 11 个配置条目，**不表示 11 个独立站点都已实测可用**。全局搜索会合并重复的 B站分类条目；配置中关闭搜索的兔小贝不参与全局搜索，仍可从首页选择后浏览。来源和媒体可用性会随网络、地区、网站结构及接口限制变化。
 
 Android 归档包含 `classes.dex`、Android ELF `.so` 和 Guard 资源，不能直接装入 iOS。详见 [独立使用调查](docs/ios-standalone-research.md) 和 [原始接口检查](docs/interface-report.json)。
 
@@ -61,8 +64,8 @@ bash scripts/build-unsigned.sh
 脚本运行 Swift 核心测试，生成 Xcode 工程，编译 iPhoneOS arm64 Release 应用，检查 Mach-O 和真机平台后打包：
 
 ```text
-dist/iMovie-0.2.0-unsigned.ipa
-dist/iMovie-0.2.0-unsigned.ipa.sha256
+dist/iMovie-0.3.0-unsigned.ipa
+dist/iMovie-0.3.0-unsigned.ipa.sha256
 ```
 
 GitHub 私有仓库内已运行 `.github/workflows/ios.yml`。在 Actions 中选择「Build unsigned iOS app → Run workflow」可以重新编译；`iMovie-unsigned-ipa` 为签名前产物，`iMovie-simulator-evidence` 为测试截图与 xcresult。云端产物保留 7 天，本地 `dist/` 文件不会因此过期。
