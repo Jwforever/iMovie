@@ -28,6 +28,6 @@
 
 [JarLoader](https://github.com/FongMi/TV/blob/5b41d9da52e1573ab9b5d399d656d11eb9fe8557/app/src/main/java/com/fongmi/android/tv/api/loader/JarLoader.java) 使用 Android 的 `DexClassLoader` 与运行时。饭太硬当前的 Guard 插件不是这些播放器主仓库里自带的通用采集规则；读取开源播放器不能自动得到配置内全部加固爬虫的 iOS 实现。
 
-本轮补充 `csp_AueteGuard` / `csp_Auete` 的 Swift 适配。旧规则中的 `auete2so.php` 已失效，当前站点公开表单为 `auete4so.php`，海报列表、详情、选集也换了结构。适配依据站点当前公开页面，播放页由 iPhone 内 WKWebView 执行。
+本轮补充 `csp_AueteGuard` / `csp_Auete` 的 Swift 适配。旧规则中的 `auete2so.php` 已失效，当前站点公开表单为 `auete4so.php`，海报列表、详情、选集也换了结构。适配依据站点当前公开页面，由 iPhone 读取播放页明确提供的公开 HLS；未找到时使用本机 WKWebView 播放。
 
 站点域名和访问限制会变化。立播旧域名和发布页指向的现行域名在本轮 macOS 探测中返回 HTTP 403；厂长多个入口也返回 403，不将它们记为已验证可用。
