@@ -143,6 +143,10 @@ final class PlaybackUITests: XCTestCase {
         capture("22-global-search-filtered")
         app.buttons["search-filter-all"].tap()
         XCTAssertTrue(app.buttons["search-hit-fixture-two|exact"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["首页"].tap()
+        app.tabBars.buttons["搜索"].tap()
+        XCTAssertFalse(app.buttons["search-hit-fixture-two|exact"].exists)
+        XCTAssertEqual(app.textFields["global-search-query"].value as? String, "搜索影片、剧集或视频")
     }
 
     func testAueteBrowseEpisodesAndSearchVerification() throws {
@@ -246,12 +250,9 @@ final class PlaybackUITests: XCTestCase {
         app.buttons["config-import"].tap()
         XCTAssertTrue(app.staticTexts["兼容情况"].waitForExistence(timeout: 15))
         app.tabBars.buttons["首页"].tap()
-        let first = app.buttons["recommendation-10001"]
+        let first = app.buttons["recommendation-1"]
         XCTAssertTrue(first.waitForExistence(timeout: 10))
-        capture("25-douban-carousel")
-        first.swipeLeft()
-        XCTAssertTrue(app.buttons["recommendation-10002"].waitForExistence(timeout: 5))
-        app.buttons["recommendation-10002"].swipeRight()
+        capture("25-site-carousel")
         first.tap()
         XCTAssertTrue(app.buttons["episode-第 1 集"].waitForExistence(timeout: 5))
         app.buttons["detail-back"].tap()

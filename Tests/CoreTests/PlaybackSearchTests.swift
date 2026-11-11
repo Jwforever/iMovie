@@ -3,6 +3,11 @@ import XCTest
 @testable import iMovieCore
 
 final class PlaybackSearchTests: XCTestCase {
+    func testFuzzySearchExpandsPartialWordsWithoutDroppingOriginal() {
+        XCTAssertEqual(SearchRanking.queries("神厨狂后"), ["神厨狂后", "神厨狂", "厨狂后"])
+        XCTAssertEqual(SearchRanking.queries("样片"), ["样片"])
+        XCTAssertEqual(SearchRanking.queries("星际 穿越"), ["星际 穿越", "星际", "穿越"])
+    }
     func testSearchRanksFullTitleBeforePrefixContainsAndUnrelated() {
         let titles = ["无关花絮", "新神厨狂后", "神厨狂后 第二季", "神厨狂后", "神话狂想"]
         let sorted = titles.sorted { SearchRanking.score(title: $0, query: "神厨狂后") > SearchRanking.score(title: $1, query: "神厨狂后") }

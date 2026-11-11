@@ -27,20 +27,23 @@ enum Theme {
 
 @MainActor struct RootView: View {
     @EnvironmentObject private var store: AppStore
+    @State private var tab = 0
+    @State private var searchSession = UUID()
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             NavigationStack { LibraryView() }
-                .tabItem { Label("首页", systemImage: "house.fill") }
-            NavigationStack { SearchView() }
-                .tabItem { Label("搜索", systemImage: "magnifyingglass") }
+                .tabItem { Label("首页", systemImage: "house.fill") }.tag(0)
+            NavigationStack { SearchView() }.id(searchSession)
+                .tabItem { Label("搜索", systemImage: "magnifyingglass") }.tag(1)
             NavigationStack { LiveView() }
-                .tabItem { Label("直播", systemImage: "tv") }
+                .tabItem { Label("直播", systemImage: "tv") }.tag(2)
             NavigationStack { CollectionView() }
-                .tabItem { Label("我的", systemImage: "bookmark") }
+                .tabItem { Label("我的", systemImage: "bookmark") }.tag(3)
             NavigationStack { SettingsView() }
-                .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
+                .tabItem { Label("设置", systemImage: "slider.horizontal.3") }.tag(4)
         }
+        .onChange(of: tab) { if $0 == 1 { searchSession = UUID() } }
         .sheet(item: $store.playback) { request in
             PlayerSheet(media: request.media).environmentObject(store)
         }
@@ -95,9 +98,8 @@ enum Theme {
         HStack(spacing: 13) {
             Button { store.play(media) } label: {
                 HStack(spacing: 13) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 16)).foregroundStyle(Theme.accent)
-                        .frame(width: 43, height: 43).background(Theme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                    CachedPosterImage(url: HTTPAddress.optional(media.poster ?? ""))
+                        .frame(width: 52, height: 52).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
                     VStack(alignment: .leading, spacing: 5) {
                         Text(media.title).font(.body.weight(.medium)).foregroundStyle(.primary).lineLimit(2)
                         if !subtitle.isEmpty || !media.group.isEmpty {

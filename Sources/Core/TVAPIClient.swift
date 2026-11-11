@@ -4,6 +4,21 @@ public struct TVAPIClient {
     private let http = HTTPClient()
     public init() {}
 
+    public func search(site: SourceSite, query: String) async throws -> [Video] {
+        var videos: [Video] = [], seen = Set<String>()
+        var failure: Error?
+        for keyword in SearchRanking.queries(query) {
+            try Task.checkCancellation()
+            do {
+                let result = try await page(site: site, search: keyword)
+                videos += result.videos.filter { seen.insert($0.id).inserted }
+            } catch is CancellationError { throw CancellationError() }
+            catch { failure = error }
+        }
+        if videos.isEmpty, let failure { throw failure }
+        return videos.sorted { SearchRanking.score(title: $0.title, query: query) > SearchRanking.score(title: $1.title, query: query) }
+    }
+
     public func page(site: SourceSite, category: String? = nil, search: String? = nil, page: Int = 1) async throws -> VideoPage {
         if category?.isEmpty != false, search?.isEmpty != false, page == 1 {
             return try await home(site: site)

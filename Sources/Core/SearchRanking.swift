@@ -1,6 +1,17 @@
 import Foundation
 
 public enum SearchRanking {
+    public static func queries(_ text: String) -> [String] {
+        let original = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var candidates = [original]
+        let words = original.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }
+        if words.count > 1 { candidates += words.sorted { $0.count > $1.count }.prefix(2) }
+        else if original.count >= 4 {
+            candidates += [String(original.prefix(max(2, original.count - 1))), String(original.suffix(max(2, original.count - 1)))]
+        }
+        var seen = Set<String>()
+        return candidates.filter { !$0.isEmpty && seen.insert($0).inserted }.prefix(3).map { $0 }
+    }
     public static func score(title: String, query: String) -> Int {
         let title = normalize(title), query = normalize(query)
         guard !query.isEmpty, !title.isEmpty else { return 0 }

@@ -21,6 +21,7 @@ final class PlaybackController: ObservableObject {
     private var generation = UUID()
     private var shouldPlay = false
     private var lastRecordedAt = Date.distantPast
+    private var liveCertificateDelegate: LiveCertificateDelegate?
 
     init() {
         progressObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] time in
@@ -35,9 +36,10 @@ final class PlaybackController: ObservableObject {
         }
     }
 
-    func select(site: SourceSite, episode: Episode, flag: String, title: String, resume: @escaping (MediaLink) -> Double) {
+    func select(site: SourceSite, episode: Episode, flag: String, title: String, poster: String = "", resume: @escaping (MediaLink) -> Double) {
         beginResolution {
-            let media = try await TVAPIClient().resolve(site: site, episode: episode, flag: flag, title: title)
+            var media = try await TVAPIClient().resolve(site: site, episode: episode, flag: flag, title: title)
+            media.poster = poster
             return (media, resume(media))
         }
     }
@@ -78,6 +80,11 @@ final class PlaybackController: ObservableObject {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
             let asset = AVURLAsset(url: url, options: media.headers.isEmpty ? nil : ["AVURLAssetHTTPHeaderFieldsKey": media.headers])
+            if media.allowsInvalidCertificate == true {
+                let delegate = LiveCertificateDelegate()
+                liveCertificateDelegate = delegate
+                asset.resourceLoader.setDelegate(delegate, queue: .global(qos: .userInitiated))
+            }
             let item = AVPlayerItem(asset: asset)
             observation = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
                 Task { @MainActor [weak self] in
@@ -148,6 +155,7 @@ final class PlaybackController: ObservableObject {
         failureObserver = nil
         player.pause()
         player.replaceCurrentItem(with: nil)
+        liveCertificateDelegate = nil
     }
 
     deinit {
@@ -155,6 +163,15 @@ final class PlaybackController: ObservableObject {
         if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
         if let progressObserver { player.removeTimeObserver(progressObserver) }
         player.pause()
+    }
+}
+
+private final class LiveCertificateDelegate: NSObject, AVAssetResourceLoaderDelegate {
+    func resourceLoader(_ resourceLoader: AVAssetResourceLoader, shouldWaitForResponseTo authenticationChallenge: URLAuthenticationChallenge) -> Bool {
+        guard authenticationChallenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = authenticationChallenge.protectionSpace.serverTrust else { return false }
+        authenticationChallenge.sender?.use(URLCredential(trust: trust), for: authenticationChallenge)
+        return true
     }
 }
 

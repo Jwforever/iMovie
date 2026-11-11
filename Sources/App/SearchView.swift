@@ -56,6 +56,7 @@ private struct SearchHit: Identifiable {
             }
         }
         .background(Theme.backdrop)
+        .onDisappear { work?.cancel() }
         .navigationTitle("搜索").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -200,8 +201,8 @@ private struct SearchHit: Identifiable {
 
     nonisolated private static func fetch(_ target: SourceSearchTarget, term: String) async -> SiteSearchResult {
         do {
-            let page = try await TVAPIClient().page(site: target.site, search: term)
-            return SiteSearchResult(target: target, videos: page.videos, error: nil)
+            let videos = try await TVAPIClient().search(site: target.site, query: term)
+            return SiteSearchResult(target: target, videos: videos, error: nil)
         } catch { return SiteSearchResult(target: target, videos: [], error: error.localizedDescription) }
     }
 

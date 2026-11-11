@@ -98,7 +98,8 @@ final class AppStore: ObservableObject {
                 defer { resolvingPlayback = false }
                 do {
                     let site = config?.sites.first { $0.key == reference.site.key } ?? reference.site
-                    let updated = try await TVAPIClient().resolve(site: site, episode: reference.episode, flag: reference.flag, title: media.title)
+                    var updated = try await TVAPIClient().resolve(site: site, episode: reference.episode, flag: reference.flag, title: media.title)
+                    updated.poster = media.poster
                     play(updated, refresh: false)
                 } catch is CancellationError { }
                 catch { self.error = error.localizedDescription }

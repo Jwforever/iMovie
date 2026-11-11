@@ -152,11 +152,6 @@ import SwiftUI
     @State private var error: String?
     @State private var requestToken = UUID()
     @State private var verifyingSource = false
-    @State private var recommendations: [DoubanRecommendation] = []
-    @State private var recommendationError: String?
-    @State private var recommendationSelection: Video?
-    @State private var showingRecommendation = false
-    @State private var lookingUpRecommendation = false
     private let client = TVAPIClient()
     private var isHome: Bool { category.isEmpty && activeSearch.isEmpty }
 
@@ -242,16 +237,6 @@ import SwiftUI
         .background(Theme.backdrop)
         .navigationTitle(embedded ? "" : Theme.sourceName(site.name)).navigationBarTitleDisplayMode(.inline)
         .task { if site.isNative && videos.isEmpty { await load(reset: true) } }
-        .task {
-            do { recommendations = try await DoubanRecommendations().fetch() }
-            catch { recommendations = [] }
-        }
-        .navigationDestination(isPresented: $showingRecommendation) {
-            if let video = recommendationSelection { VideoDetailView(site: site, video: video) }
-        }
-        .alert("推荐影片", isPresented: Binding(get: { recommendationError != nil }, set: { if !$0 { recommendationError = nil } })) {
-            Button("知道了", role: .cancel) { recommendationError = nil }
-        } message: { Text(recommendationError ?? "") }
         .sheet(isPresented: $verifyingSource, onDismiss: { Task { await load(reset: true) } }) {
             if let url = try? AueteAdapter.pageURL(category: category, search: activeSearch, page: 1) {
                 SourceVerificationView(url: url)
@@ -264,54 +249,16 @@ import SwiftUI
             HStack {
                 Text("今日推荐").font(.title3.bold())
                 Spacer()
-                if lookingUpRecommendation { ProgressView() }
-                Text(recommendations.isEmpty ? "来源推荐" : "豆瓣高分").font(.caption).foregroundStyle(.secondary)
+                Text("本站热播").font(.caption).foregroundStyle(.secondary)
             }
             TabView {
-                if recommendations.isEmpty {
                     ForEach(Array(videos.prefix(6))) { video in
                         NavigationLink { VideoDetailView(site: site, video: video) } label: {
                             FeaturedVideoCard(video: video, source: Theme.sourceName(site.name)).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.plain).accessibilityIdentifier("recommendation-\(video.id)")
                     }
-                } else {
-                    ForEach(Array(recommendations.prefix(6))) { item in
-                        Button { lookup(item) } label: {
-                            FeaturedVideoCard(video: Video(id: item.id, title: item.title, poster: item.poster, note: item.subtitle, summary: "", playFrom: "", playURL: ""),
-                                              source: "豆瓣 \(String(format: "%.1f", item.rating)) · \(item.votes) 人评价", rating: item.rating)
-                                .contentShape(Rectangle())
-                        }.buttonStyle(.plain).disabled(lookingUpRecommendation)
-                            .accessibilityIdentifier("recommendation-\(item.id)")
-                    }
-                }
             }.tabViewStyle(.page(indexDisplayMode: .always)).frame(height: 240)
                 .accessibilityIdentifier("home-carousel")
-            if !recommendations.isEmpty {
-                Text("评分来自豆瓣公开榜单；点选后查找当前来源中的同名影片。")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func lookup(_ recommendation: DoubanRecommendation) {
-        if let video = videos.first(where: { DoubanRecommendations.matches(recommendation.title, video: $0) }) {
-            recommendationSelection = video
-            showingRecommendation = true
-            return
-        }
-        lookingUpRecommendation = true
-        Task {
-            defer { lookingUpRecommendation = false }
-            do {
-                let result = try await client.page(site: site, search: recommendation.title)
-                guard !Task.isCancelled else { return }
-                if let video = result.videos.first(where: { DoubanRecommendations.matches(recommendation.title, video: $0) }) {
-                    recommendationSelection = video
-                    showingRecommendation = true
-                } else {
-                    recommendationError = "当前来源没有找到“\(recommendation.title)”的同名影片，可以切换来源后再试。"
-                }
-            } catch { recommendationError = error.localizedDescription }
         }
     }
 
@@ -343,7 +290,8 @@ import SwiftUI
                         ForEach(Array(store.history.prefix(10))) { record in
                             Button { store.play(record.media) } label: {
                                 HStack(spacing: 11) {
-                                    Image(systemName: "play.fill").font(.title3).foregroundStyle(Theme.accent)
+                                    CachedPosterImage(url: HTTPAddress.optional(record.media.poster ?? ""))
+                                        .frame(width: 48, height: 48).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(record.media.title).font(.subheadline.weight(.semibold)).lineLimit(1).foregroundStyle(.primary)
                                         Text(record.position > 0 ? "看到 \(Int(record.position) / 60):\(String(format: "%02d", Int(record.position) % 60)) · 继续播放" : "继续播放")
@@ -374,7 +322,13 @@ import SwiftUI
         let requestedPage = reset ? 1 : page + 1
         defer { if requestToken == token { loading = false } }
         do {
-            let result = try await client.page(site: site, category: category, search: activeSearch, page: requestedPage)
+            let result: VideoPage
+            if !activeSearch.isEmpty {
+                let matches = try await client.search(site: site, query: activeSearch)
+                result = VideoPage(categories: [], videos: matches, page: 1, pageCount: 1)
+            } else {
+                result = try await client.page(site: site, category: category, page: requestedPage)
+            }
             guard requestToken == token, !Task.isCancelled else { return }
             if reset { videos = result.videos }
             else {
@@ -470,6 +424,7 @@ import SwiftUI
     @State private var selection: Episode?
     @State private var selectedLine: String?
     @State private var error: String?
+    @State private var verifyingDetail = false
     private let client = TVAPIClient()
 
     var body: some View {
@@ -518,6 +473,10 @@ import SwiftUI
                 if loading { ProgressView("正在加载选集…") }
                 if let error {
                     Text(error).font(.subheadline).foregroundStyle(.orange)
+                    if site.nativeAdapter == .auete || site.usesGenericAdapter {
+                        Button("打开网站验证") { verifyingDetail = true }.buttonStyle(.bordered)
+                            .accessibilityIdentifier("detail-verify")
+                    }
                     Button("重新加载") { Task { await fetchDetail() } }.buttonStyle(.bordered)
                 }
                 if let detail {
@@ -553,6 +512,11 @@ import SwiftUI
         }
         .toolbar(selection == nil ? .visible : .hidden, for: .tabBar)
         .task { await fetchDetail() }
+        .sheet(isPresented: $verifyingDetail, onDismiss: { Task { await fetchDetail() } }) {
+            if let url = HTTPAddress.optional(video.id, relativeTo: HTTPAddress.optional(site.genericRule?.baseURL ?? AueteAdapter.origin.absoluteString)) {
+                SourceVerificationView(url: url)
+            }
+        }
         .onChange(of: scenePhase) { phase in
             if phase != .active, let media = playback.media { store.record(media, position: playback.position) }
         }
@@ -572,6 +536,6 @@ import SwiftUI
         selection = episode
         selectedLine = line
         playback.onProgress = { [weak store] in store?.record($0, position: $1) }
-        playback.select(site: site, episode: episode, flag: line, title: "\(video.title) · \(episode.title)", resume: { [weak store] in store?.position(for: $0) ?? 0 })
+        playback.select(site: site, episode: episode, flag: line, title: "\(video.title) · \(episode.title)", poster: (detail ?? video).poster, resume: { [weak store] in store?.position(for: $0) ?? 0 })
     }
 }

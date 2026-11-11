@@ -4,7 +4,8 @@ import FoundationNetworking
 #endif
 
 public struct HTTPClient {
-    public init() {}
+    private let allowsInvalidCertificate: Bool
+    public init(allowsInvalidCertificate: Bool = false) { self.allowsInvalidCertificate = allowsInvalidCertificate }
 
     public func data(from url: URL, headers: [String: String] = [:], cacheLifetime: TimeInterval = 0) async throws -> (Data, URL) {
         var request = URLRequest(url: url, timeoutInterval: 25)
@@ -41,7 +42,7 @@ public struct HTTPClient {
     private func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
         let transient: Set<URLError.Code> = [.networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .timedOut]
         for attempt in 0...1 {
-            do { return try await URLSession.shared.data(for: request) }
+            do { return try await (allowsInvalidCertificate ? LiveNetwork.shared.session : URLSession.shared).data(for: request) }
             catch let error as URLError where attempt == 0 && request.httpMethod != "POST" && transient.contains(error.code) {
                 try Task.checkCancellation()
                 try await Task.sleep(nanoseconds: 400_000_000)
@@ -60,7 +61,11 @@ public struct HTTPClient {
         guard !source.needsAndroidProxy else {
             throw ViewerError.message("这个直播源指向 Android 应用内的本地代理，在 iPhone 上不可直接访问。")
         }
-        let (data, url) = try await data(from: HTTPAddress.parse(source.url), headers: source.headers)
-        return try PlaylistDecoder.decode(data, baseURL: url, defaultHeaders: source.headers)
+        let client = HTTPClient(allowsInvalidCertificate: true)
+        let address = source.url.hasPrefix("https://ghproxy.net/https://raw.githubusercontent.com/") ? String(source.url.dropFirst("https://ghproxy.net/".count)) : source.url
+        let (data, url) = try await client.data(from: HTTPAddress.parse(address), headers: source.headers)
+        return try PlaylistDecoder.decode(data, baseURL: url, defaultHeaders: source.headers).map { item in
+            var item = item; item.allowsInvalidCertificate = true; return item
+        }
     }
 }

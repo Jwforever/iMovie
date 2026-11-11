@@ -7,7 +7,7 @@ public struct MediaResolver {
     public init() {}
 
     public func resolve(_ source: MediaLink) async throws -> MediaLink {
-        if source.kind != .web && HTTPAddress.isMedia(source.url) { return source }
+        if source.kind != .web && (HTTPAddress.isMedia(source.url) || source.allowsInvalidCertificate == true) { return source }
         var pending: [(URL, Int, String?)] = [(try HTTPAddress.parse(source.url), 0, source.headers["Referer"])]
         var seen = Set<String>()
         var lastError: Error?
@@ -61,6 +61,8 @@ public struct MediaResolver {
     private func direct(_ url: URL, source: MediaLink, headers: [String: String]) -> MediaLink {
         var result = MediaLink(title: source.title, url: url.absoluteString, headers: headers, group: source.group, kind: .direct)
         result.reference = source.reference
+        result.poster = source.poster
+        result.allowsInvalidCertificate = source.allowsInvalidCertificate
         return result
     }
 

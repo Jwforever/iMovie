@@ -16,6 +16,7 @@ public enum PlaylistDecoder {
         var channels: [MediaLink] = []
         var title = ""
         var group = ""
+        var poster: String?
         var headers = defaultHeaders
         var seen = Set<String>()
         for raw in text.components(separatedBy: .newlines) {
@@ -24,6 +25,7 @@ public enum PlaylistDecoder {
             if line.hasPrefix("#EXTINF:") {
                 title = textAfterUnquotedComma(line) ?? "频道 \(channels.count + 1)"
                 group = attribute("group-title", in: line) ?? ""
+                poster = attribute("tvg-logo", in: line).flatMap { HTTPAddress.optional($0, relativeTo: baseURL)?.absoluteString }
                 headers = defaultHeaders
                 if let value = attribute("http-user-agent", in: line) { headers["User-Agent"] = value }
                 if let value = attribute("http-referrer", in: line) { headers["Referer"] = value }
@@ -75,9 +77,11 @@ public enum PlaylistDecoder {
                 continue
             }
             let name = itemTitle.isEmpty ? (url.lastPathComponent.isEmpty ? "频道 \(channels.count + 1)" : url.lastPathComponent) : itemTitle
-            let media = MediaLink(title: name, url: url.absoluteString, headers: itemHeaders, group: group)
+            var media = MediaLink(title: name, url: url.absoluteString, headers: itemHeaders, group: group)
+            media.poster = poster
             if seen.insert(media.id).inserted { channels.append(media) }
             title = ""
+            poster = nil
             headers = defaultHeaders
         }
         guard !channels.isEmpty else {

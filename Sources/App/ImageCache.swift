@@ -1,10 +1,13 @@
 import SwiftUI
 import CryptoKit
+import ImageIO
 
 /// Shared across grids, recommendations and details. In-flight requests are coalesced.
 actor ImageCache {
     static let shared = ImageCache()
     private let memory = NSCache<NSURL, NSData>()
+    private let decoded = NSCache<NSURL, UIImage>()
+    private var lastPrune = Date.distantPast
     private let folder: URL
     private var pending: [URL: Task<Data, Error>] = [:]
     private var generation = 0
@@ -14,8 +17,28 @@ actor ImageCache {
     init() {
         memory.totalCostLimit = 32 * 1024 * 1024
         memory.countLimit = 180
+        decoded.totalCostLimit = 32 * 1024 * 1024
         folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("iMovie-posters-v1", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    }
+
+    func image(for url: URL) async throws -> UIImage {
+        if let image = decoded.object(forKey: url as NSURL) { return image }
+        let token = generation
+        let data = try await imageData(for: url)
+        let image = try await Task.detached(priority: .utility) {
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 600,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceShouldCacheImmediately: true
+                  ] as CFDictionary) else { throw ViewerError.message("图片无法解码。") }
+            return UIImage(cgImage: cgImage)
+        }.value
+        guard token == generation else { throw CancellationError() }
+        decoded.setObject(image, forKey: url as NSURL, cost: Int(image.size.width * image.size.height * 4))
+        return image
     }
 
     func imageData(for url: URL) async throws -> Data {
@@ -32,6 +55,7 @@ actor ImageCache {
         let task = Task<Data, Error> {
             var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 25)
             request.setValue(HTMLSourceAdapter.userAgent, forHTTPHeaderField: "User-Agent")
+            if let host = url.host { request.setValue("\(url.scheme ?? "https")://\(host)/", forHTTPHeaderField: "Referer") }
             let host = url.host?.lowercased() ?? ""
             if host == "doubanio.com" || host.hasSuffix(".doubanio.com") {
                 request.setValue("https://m.douban.com/", forHTTPHeaderField: "Referer")
@@ -50,7 +74,7 @@ actor ImageCache {
             pending[url] = nil
             memory.setObject(data as NSData, forKey: url as NSURL, cost: data.count)
             try? data.write(to: file, options: .atomic)
-            prune()
+            if Date().timeIntervalSince(lastPrune) > 60 { lastPrune = Date(); prune() }
             return data
         } catch {
             if token == generation { pending[url] = nil }
@@ -67,6 +91,7 @@ actor ImageCache {
         pending.values.forEach { $0.cancel() }
         pending.removeAll()
         memory.removeAllObjects()
+        decoded.removeAllObjects()
         for file in files() { try? FileManager.default.removeItem(at: file) }
     }
 
@@ -102,8 +127,8 @@ actor ImageCache {
         }
         .task(id: url) {
             image = nil
-            guard let url, let data = try? await ImageCache.shared.imageData(for: url), !Task.isCancelled else { return }
-            image = UIImage(data: data)
+            guard let url, let loaded = try? await ImageCache.shared.image(for: url), !Task.isCancelled else { return }
+            image = loaded
         }
     }
 }

@@ -135,6 +135,8 @@ public struct MediaLink: Codable, Identifiable, Hashable {
     public var group: String
     public var kind: PlaybackKind? = nil
     public var reference: PlaybackReference? = nil
+    public var poster: String? = nil
+    public var allowsInvalidCertificate: Bool? = nil
     public var id: String {
         if let reference { return reference.site.key + "|" + reference.episode.value + "|" + title }
         return url + "|" + title
