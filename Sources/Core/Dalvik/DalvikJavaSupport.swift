@@ -50,6 +50,10 @@ extension DalvikNatives {
         vm.register("Ljava/util/regex/Matcher;", "groupCount") { _, this, _ in .int(Int32((this?.payload as? MatcherBox)?.regex?.numberOfCaptureGroups ?? 0)) }
         vm.register("Ljava/lang/Runtime;", "getRuntime") { _, _, _ in .ref(DalvikObject(className: "Ljava/lang/Runtime;")) }
         vm.register("Ljava/lang/Runtime;", "availableProcessors") { _, _, _ in .int(Int32(ProcessInfo.processInfo.activeProcessorCount)) }
+        vm.register("Ljava/nio/charset/Charset;", "forName") { _, _, args in
+            let object = DalvikObject(className: "Ljava/nio/charset/Charset;"); object.payload = text(args.first); return .ref(object)
+        }
+        vm.register("Ljava/nio/charset/Charset;", "name") { _, this, _ in .ref(DalvikObject.string(this?.stringPayload ?? "UTF-8")) }
         for name in ["<init>", "push", "pop", "peek", "empty", "size", "isEmpty"] {
             vm.register("Ljava/util/Stack;", name) { _, this, args in
                 var values = this?.items ?? []

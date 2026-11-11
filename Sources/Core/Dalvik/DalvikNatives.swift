@@ -21,6 +21,7 @@ enum DalvikNatives {
         reflectionSupport(vm)
         gsonSupport(vm)
         cryptoSupport(vm)
+        hostSupport(vm)
     }
 
     // MARK: - 取值助手
@@ -59,7 +60,18 @@ enum DalvikNatives {
     }
 
     static func storeMap(_ object: DalvikObject?, _ value: [String: DalvikValue]) {
+        let previous = mapKeys(object).filter { value[$0] != nil }
+        let keys = previous + value.keys.filter { !previous.contains($0) }.sorted()
+        let order = DalvikObject(className: "[Ljava/lang/String;"); order.items = keys.map { .ref(DalvikObject.string($0)) }
+        object?.fields["mapKeys"] = .ref(order)
         object?.payload = value
+    }
+
+    static func mapKeys(_ object: DalvikObject?) -> [String] {
+        let values = map(object)
+        if object?.className == "Ljava/util/TreeMap;" { return values.keys.sorted() }
+        let saved = (object?.fields["mapKeys"]?.asObject?.items ?? []).map { text($0) }.filter { values[$0] != nil }
+        return saved + values.keys.filter { !saved.contains($0) }.sorted()
     }
 
     static func boxed(_ value: DalvikValue) -> DalvikValue { value }
@@ -145,9 +157,9 @@ enum DalvikNatives {
             }
             return .int(Int32(value.distance(from: value.startIndex, to: range.lowerBound)))
         }
-        vm.register("Ljava/lang/String;", "lastIndexOf") { _, this, args in
+        vm.register("Ljava/lang/String;", "lastIndexOf") { vm, this, args in
             let value = this?.stringPayload ?? ""
-            let needle = string(args.first ?? .ref(nil)) ?? ""
+            let needle = vm.invocationParameters.first == "I" ? String(decoding: [UInt16(truncatingIfNeeded: args.first?.intValue ?? 0)], as: UTF16.self) : string(args.first ?? .ref(nil)) ?? ""
             guard let range = value.range(of: needle, options: .backwards) else { return .int(-1) }
             return .int(Int32(value.distance(from: value.startIndex, to: range.lowerBound)))
         }
@@ -288,7 +300,15 @@ enum DalvikNatives {
             vm.register(className, "append") { vm, this, args in
                 let current = this?.fields[bufferKey]?.asObject?.stringPayload ?? ""
                 let character = vm.invocationParameters.last == "C"
-                let suffix = character ? String(decoding: [UInt16(truncatingIfNeeded: args.first?.intValue ?? 0)], as: UTF16.self) : text(args.first)
+                var suffix = character ? String(decoding: [UInt16(truncatingIfNeeded: args.first?.intValue ?? 0)], as: UTF16.self) : text(args.first)
+                if vm.invocationParameters.first == "[C" {
+                    suffix = String(decoding: (args.first?.asObject?.items ?? []).map { UInt16(truncatingIfNeeded: $0.intValue) }, as: UTF16.self)
+                }
+                if args.count == 3 {
+                    let chars = Array(suffix.utf16), start = max(0, Int(args[1].intValue))
+                    let count = vm.invocationParameters.first == "[C" ? max(0, Int(args[2].intValue)) : max(0, Int(args[2].intValue) - start)
+                    suffix = String(decoding: chars.dropFirst(start).prefix(count), as: UTF16.self)
+                }
                 this?.fields[bufferKey] = .ref(DalvikObject.string(current + suffix))
                 return .ref(this)
             }
@@ -328,6 +348,24 @@ enum DalvikNatives {
                 let char = current[current.index(current.startIndex, offsetBy: index)]
                 return .int(Int32(char.unicodeScalars.first?.value ?? 0))
             }
+            for name in ["delete", "deleteCharAt", "substring", "indexOf", "lastIndexOf"] {
+                vm.register(className, name) { _, this, args in
+                    let current = this?.fields[bufferKey]?.asObject?.stringPayload ?? ""
+                    if name == "indexOf" || name == "lastIndexOf" {
+                        let source = current as NSString, needle = text(args.first)
+                        let start = args.count > 1 ? min(source.length, max(0, Int(args[1].intValue))) : 0
+                        let range = source.range(of: needle, options: name == "lastIndexOf" ? .backwards : [], range: NSRange(location: start, length: source.length - start))
+                        return .int(range.location == NSNotFound ? -1 : Int32(range.location))
+                    }
+                    var chars = Array(current.utf16)
+                    let lower = min(chars.count, max(0, Int(args.first?.intValue ?? 0)))
+                    let upper = min(chars.count, max(lower, name == "deleteCharAt" ? lower + 1 : args.count > 1 ? Int(args[1].intValue) : chars.count))
+                    if name == "substring" { return .ref(DalvikObject.string(String(decoding: chars[lower..<upper], as: UTF16.self))) }
+                    chars.removeSubrange(lower..<upper)
+                    this?.fields[bufferKey] = .ref(DalvikObject.string(String(decoding: chars, as: UTF16.self)))
+                    return .ref(this)
+                }
+            }
         }
     }
 
@@ -358,7 +396,10 @@ enum DalvikNatives {
             vm.register(className, "intValue") { _, this, _ in .int((this?.payload as? DalvikValue)?.intValue ?? 0) }
             vm.register(className, "longValue") { _, this, _ in .long((this?.payload as? DalvikValue)?.longValue ?? 0) }
             vm.register(className, "doubleValue") { _, this, _ in .double((this?.payload as? DalvikValue)?.doubleValue ?? 0) }
-            vm.register(className, "toString") { _, this, args in .ref(DalvikObject.string(text(args.first ?? this.map { .ref($0) }))) }
+            vm.register(className, "toString") { _, this, args in
+                let value = args.first ?? (this.map { .ref($0) } ?? .ref(nil))
+                return .ref(DalvikObject.string(text(value)))
+            }
             vm.register(className, "compare") { _, _, args in
                 let left = args.first?.doubleValue ?? 0
                 let right = args.count > 1 ? args[1].doubleValue : 0
@@ -559,15 +600,25 @@ enum DalvikNatives {
             vm.register(className, "clear") { _, this, _ in storeMap(this, [:]); return .ref(nil) }
             vm.register(className, "keySet") { _, this, _ in
                 let object = DalvikObject(className: "Ljava/util/Set;")
-                object.payload = IteratorBox(items: map(this).keys.sorted().map { .ref(DalvikObject.string($0)) }, index: 0)
+                object.payload = IteratorBox(items: mapKeys(this).map { .ref(DalvikObject.string($0)) }, index: 0)
                 return .ref(object)
             }
             vm.register(className, "values") { _, this, _ in
                 let object = DalvikObject(className: "[Ljava/lang/Object;")
-                object.items = map(this).values.sorted { text($0) < text($1) }
+                object.items = mapKeys(this).compactMap { map(this)[$0] }
+                return .ref(object)
+            }
+            vm.register(className, "entrySet") { _, this, _ in
+                let object = DalvikObject(className: "Ljava/util/Set;")
+                object.payload = IteratorBox(items: mapKeys(this).map { key in
+                    let entry = DalvikObject(className: "Ljava/util/Map$Entry;")
+                    entry.fields["key"] = .ref(DalvikObject.string(key)); entry.fields["value"] = map(this)[key]; return .ref(entry)
+                }, index: 0)
                 return .ref(object)
             }
         }
+        vm.register("Ljava/util/Map$Entry;", "getKey") { _, this, _ in this?.fields["key"] ?? .ref(nil) }
+        vm.register("Ljava/util/Map$Entry;", "getValue") { _, this, _ in this?.fields["value"] ?? .ref(nil) }
         vm.register("Ljava/util/Set;", "iterator") { _, this, _ in
             let object = DalvikObject(className: "Ljava/util/Iterator;")
             object.payload = this?.payload as? IteratorBox ?? IteratorBox(items: [], index: 0)

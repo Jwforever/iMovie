@@ -49,7 +49,11 @@ public struct TVAPIClient {
     public func detail(site: SourceSite, id: String) async throws -> Video {
         if site.isPlugin {
             // 插件自己解析（和 OK影视 同一份逻辑），规则只是兜底。
-            do { return try await DalvikSourceAdapter(site: site).detail(id: id) }
+            do {
+                let video = try await DalvikSourceAdapter(site: site).detail(id: id)
+                if video.lines.isEmpty, let fallback = try? await GenericSourceAdapter(site: site).detail(id: id), !fallback.lines.isEmpty { return fallback }
+                return video
+            }
             catch is CancellationError { throw CancellationError() }
             catch {
                 let pluginError = error

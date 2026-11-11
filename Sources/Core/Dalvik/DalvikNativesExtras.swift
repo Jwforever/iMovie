@@ -35,6 +35,10 @@ extension DalvikNatives {
             if let value = map(this)[text(args.first)], !value.isNull { return .int(value.intValue) }
             return args.count > 1 ? .int(args[1].intValue) : .int(0)
         }
+        vm.register("Lorg/json/JSONObject;", "optLong") { _, this, args in
+            if let value = map(this)[text(args.first)], !value.isNull { return .long(value.longValue) }
+            return .long(args.count > 1 ? args[1].longValue : 0)
+        }
         vm.register("Lorg/json/JSONObject;", "optBoolean") { _, this, args in
             .int(map(this)[text(args.first)]?.intValue ?? 0)
         }
@@ -517,7 +521,7 @@ extension DalvikNatives {
             for impl in impls {
                 for name in ["<init>", "add", "get", "size", "isEmpty", "clear", "contains",
                              "indexOf", "iterator", "put", "getOrDefault", "containsKey",
-                             "remove", "keySet", "values", "length", "charAt"] {
+                             "remove", "keySet", "values", "entrySet", "addAll", "length", "charAt"] {
                     if let body = vm.nativeBody(impl, name) {
                         vm.registerAlias(iface, name, body)
                     }

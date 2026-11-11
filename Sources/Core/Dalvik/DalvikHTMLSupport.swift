@@ -52,6 +52,14 @@ enum DalvikHTMLSupport {
         vm.registerOverride(elementName, "h") { _, this, _ in
             .ref(DalvikObject.string(try (this?.payload as? Element)?.html() ?? ""))
         }
+        vm.registerOverride(elementName, "mG") { _, this, _ in
+            .ref(DalvikObject.string(try (this?.payload as? Element)?.html() ?? ""))
+        }
+        for name in ["ee", "toString"] {
+            vm.registerOverride(parentName, name) { _, this, _ in
+                .ref(DalvikObject.string(try (this?.payload as? Element)?.outerHtml() ?? ""))
+            }
+        }
         vm.registerOverride(elementName, "nQ") { _, this, _ in
             .ref(DalvikObject.string((this?.payload as? Element)?.tagName() ?? ""))
         }
@@ -59,7 +67,7 @@ enum DalvikHTMLSupport {
             .ref(DalvikObject.string(try (this?.payload as? Element)?.attr("id") ?? ""))
         }
         vm.registerOverride(elementName, "p") { _, this, args in
-            .int(try (this?.payload as? Element)?.hasClass(DalvikNatives.text(args.first)) == true ? 1 : 0)
+            .int((this?.payload as? Element)?.hasClass(DalvikNatives.text(args.first)) == true ? 1 : 0)
         }
         vm.registerOverride(parentName, "N") { _, this, args in
             guard let node = this?.payload as? Element else { return .ref(DalvikObject.string("")) }
