@@ -566,7 +566,7 @@ enum DalvikNatives {
         vm.register("Ljava/util/Iterator;", "remove") { _, _, _ in .ref(nil) }
 
         let mapClasses = ["Ljava/util/HashMap;", "Ljava/util/LinkedHashMap;", "Ljava/util/TreeMap;",
-                          "Ljava/util/AbstractMap;"]
+                          "Ljava/util/IdentityHashMap;", "Ljava/util/AbstractMap;"]
         for className in mapClasses {
             vm.register(className, "<init>") { _, this, _ in
                 this?.payload = [String: DalvikValue]()
@@ -579,6 +579,15 @@ enum DalvikNatives {
                 current[key] = args.count > 1 ? args[1] : .ref(nil)
                 storeMap(this, current)
                 return old
+            }
+            vm.register(className, "putAll") { _, this, args in
+                var current = map(this)
+                let source = args.first?.asObject
+                for key in mapKeys(source) {
+                    if let value = map(source)[key] { current[key] = value }
+                }
+                storeMap(this, current)
+                return .ref(nil)
             }
             vm.register(className, "get") { _, this, args in
                 map(this)[text(args.first)] ?? .ref(nil)

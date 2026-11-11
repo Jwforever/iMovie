@@ -11,9 +11,17 @@ final class LivePluginDiagnosticsTests: XCTestCase {
         let index = GuardRuleCatalog.decode(file: try DexFile(data: dex), source: config.spider ?? "")
         let sites = config.sites.filter(\.isPlugin)
         var reports: [[String: Any]] = []
+        let destination = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("dist/plugin-source-diagnostics.json")
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let classCount = try DalvikImage(data: dex).classes.count
+        func saveReports() throws {
+            let data = try JSONSerialization.data(withJSONObject: ["spider": config.spider ?? "", "classes": classCount, "sources": reports], options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: destination, options: .atomic)
+        }
         // 同一个 collector 只诊断一次；保留所有配置条目及原始域名来源。
-        for batchStart in stride(from: 0, to: sites.count, by: 4) {
-            let batch = Array(sites[batchStart..<min(batchStart + 4, sites.count)])
+        // 插件解释器和 SwiftSoup 都会分配较大的临时对象，逐源执行以免并行诊断耗尽 runner 内存。
+        for batchStart in stride(from: 0, to: sites.count, by: 1) {
+            let batch = [sites[batchStart]]
             let output = await withTaskGroup(of: [String: Any].self) { group in
                 for site in batch {
                     group.addTask {
@@ -103,11 +111,12 @@ final class LivePluginDiagnosticsTests: XCTestCase {
             }
             reports += output
             for report in output {
-                if let bytes = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), let text = String(data: bytes, encoding: .utf8) { print("SOURCE_DIAGNOSTIC " + text) }
+                if let bytes = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]), let text = String(data: bytes, encoding: .utf8) {
+                    FileHandle.standardOutput.write(Data(("SOURCE_DIAGNOSTIC " + text + "\n").utf8))
+                }
             }
+            try saveReports()
         }
-        let destination = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("dist/plugin-source-diagnostics.json")
-        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONSerialization.data(withJSONObject: ["spider": config.spider ?? "", "classes": try DalvikImage(data: dex).classes.count, "sources": reports], options: [.prettyPrinted, .sortedKeys]).write(to: destination)
+        try saveReports()
     }
 }
