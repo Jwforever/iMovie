@@ -40,4 +40,11 @@ final class GenericSourceTests: XCTestCase {
             XCTFail("Class identifiers cannot invent domains")
         } catch { XCTAssertTrue(error.localizedDescription.contains("没有提供")) }
     }
+
+    func testGenericPaginationFollowsActualSameSiteLinks() throws {
+        let base = URL(string: "https://example.test/type/index.html")!
+        let html = #"<a href='https://ads.test/page/2'>下一页</a><a href='#' class='disabled'>下一页</a><a href='index2.html' rel='next'>下一页</a>"#
+        XCTAssertEqual(try GenericSourceAdapter.nextPageURL(Data(html.utf8), baseURL: base)?.absoluteString, "https://example.test/type/index2.html")
+        XCTAssertNil(try GenericSourceAdapter.nextPageURL(Data(#"<a href='/type/index.html'>下一页</a>"#.utf8), baseURL: base))
+    }
 }

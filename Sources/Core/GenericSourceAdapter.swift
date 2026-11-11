@@ -81,19 +81,19 @@ public struct GenericSourceAdapter {
         let term = search?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let isJSON = rule.mode == "json" || (rule.mode != "html" && (origin.path.contains("/api") || origin.pathExtension == "php"))
         var urls: [URL] = []
-        if isJSON {
+        let explicitTemplate = !term.isEmpty ? rule.searchURL : (category?.isEmpty == false ? rule.categoryURL : nil)
+        if let template = explicitTemplate {
+            urls = [try Self.expand(template, base: origin, query: term, page: page, category: category ?? "")]
+        } else if isJSON {
             var query = ["ac": "detail", "pg": String(max(1, page))]
             if !term.isEmpty { query["wd"] = term }
             if let category, !category.isEmpty { query["t"] = category }
             urls = [try Self.queryURL(origin, values: query)]
         } else if !term.isEmpty {
-            if let template = rule.searchURL { urls = [try Self.expand(template, base: origin, query: term, page: page)] }
-            else {
-                urls = [try Self.expand("/auete4so.php?searchword={query}&page={page}", base: origin, query: term, page: page),
+            urls = [try Self.expand("/auete4so.php?searchword={query}&page={page}", base: origin, query: term, page: page),
                         try Self.expand("/vodsearch/-------------.html?wd={query}", base: origin, query: term, page: page),
                         try Self.expand("/index.php/vod/search.html?wd={query}", base: origin, query: term, page: page),
                         try Self.expand("/s----------.html?wd={query}", base: origin, query: term, page: page)]
-            }
         } else if let category, !category.isEmpty {
             let template = rule.categoryURL ?? "{category}"
             urls = [try Self.expand(template, base: origin, page: page, category: category)]
@@ -103,9 +103,22 @@ public struct GenericSourceAdapter {
         for url in urls {
             try Task.checkCancellation()
             do {
-                let (data, final) = try await http.data(from: url, headers: headers(rule), cacheLifetime: term.isEmpty ? 180 : 0)
+                var (data, final) = try await http.data(from: url, headers: headers(rule), cacheLifetime: term.isEmpty ? 180 : 0)
                 if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any], root["list"] != nil {
                     return TVAPIClient.decodePage(root, baseURL: final)
+                }
+                // When a rule has no page placeholder, follow the site's actual next links.
+                // Catalog responses are cached, so previous pages do not need fresh downloads.
+                if page > 1 && !(explicitTemplate?.contains("{page}") ?? (!term.isEmpty && url.path.contains("auete4so"))) {
+                    var visited = Set([final.absoluteString])
+                    guard page <= 50 else { throw ViewerError.message("通用分页超过 50 页，请设置含 {page} 的地址模板。") }
+                    for _ in 1..<page {
+                        try Task.checkCancellation()
+                        guard let next = try Self.nextPageURL(data, baseURL: final), visited.insert(next.absoluteString).inserted else {
+                            throw ViewerError.message("来源没有提供下一页地址，请设置含 {page} 的分类 / 搜索模板。")
+                        }
+                        (data, final) = try await http.data(from: next, headers: headers(rule), cacheLifetime: term.isEmpty ? 180 : 0)
+                    }
                 }
                 let result = try Self.decodePage(data, baseURL: final, rule: rule, page: page)
                 if !result.videos.isEmpty || urls.count == 1 { return result }
@@ -119,10 +132,10 @@ public struct GenericSourceAdapter {
     public func detail(id: String) async throws -> Video {
         let rule = try await rule(), base = try HTTPAddress.parse(rule.baseURL)
         let url: URL
-        if rule.mode == "json" || (rule.mode != "html" && (base.path.contains("/api") || base.pathExtension == "php")) {
+        if let template = rule.detailURL { url = try Self.expand(template, base: base, id: id) }
+        else if rule.mode == "json" || (rule.mode != "html" && (base.path.contains("/api") || base.pathExtension == "php")) {
             url = try Self.queryURL(base, values: ["ac": "detail", "ids": id])
-        } else if let template = rule.detailURL { url = try Self.expand(template, base: base, id: id) }
-        else { url = try HTTPAddress.parse(id, relativeTo: base) }
+        } else { url = try HTTPAddress.parse(id, relativeTo: base) }
         let (data, final) = try await http.data(from: url, headers: headers(rule))
         if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any], root["list"] != nil,
            let video = TVAPIClient.decodePage(root, baseURL: final).videos.first { return video }
@@ -160,10 +173,7 @@ public struct GenericSourceAdapter {
             let name = try link.text()
             if !name.isEmpty && name.count < 15 { categories.append(VideoCategory(id: url.absoluteString, name: name)) }
         }
-        let next = try doc.select("a[href]").array().contains { node in
-            let text = try node.text(), href = try node.attr("href")
-            return text.contains("下一页") && !href.isEmpty && href != "#"
-        }
+        let next = try nextPageURL(data, baseURL: baseURL) != nil
         if videos.isEmpty && categories.isEmpty { throw ViewerError.message("已连接来源，但通用规则没有识别出影片。可修改列表 / 标题选择器，或检查站点验证提示。") }
         return VideoPage(categories: categories, videos: videos, page: max(1, page), pageCount: next ? max(1, page) + 1 : max(1, page))
     }
@@ -199,6 +209,20 @@ public struct GenericSourceAdapter {
             }
         }
         return ""
+    }
+    static func nextPageURL(_ data: Data, baseURL: URL) throws -> URL? {
+        let doc = try document(data, base: baseURL)
+        for link in try doc.select("a[href], link[rel=next][href]").array() {
+            let text = try link.text().trimmingCharacters(in: .whitespacesAndNewlines)
+            let rel = try link.attr("rel").lowercased().split(separator: " ")
+            let disabled = try link.attr("class").lowercased().contains("disabled") || link.attr("aria-disabled") == "true"
+            let href = try link.attr("href").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !disabled, rel.contains("next") || text.contains("下一页") || text == "下页" || text.lowercased() == "next",
+                  !href.isEmpty, !href.hasPrefix("#"), let url = HTTPAddress.optional(href, relativeTo: baseURL), sameSite(url, baseURL),
+                  url.absoluteString != baseURL.absoluteString, !url.path.isEmpty else { continue }
+            return url
+        }
+        return nil
     }
     private static func sameSite(_ url: URL, _ base: URL) -> Bool {
         url.host?.lowercased().replacingOccurrences(of: "www.", with: "") == base.host?.lowercased().replacingOccurrences(of: "www.", with: "")

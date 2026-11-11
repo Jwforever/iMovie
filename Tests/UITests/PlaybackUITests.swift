@@ -314,6 +314,22 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "没有提供可读取的网站地址")).firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["来源地址 / 通用规则"].exists)
         capture("29-generic-source-error")
+        app.buttons["来源地址 / 通用规则"].tap()
+        let address = app.textFields["source-rule-address"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        address.tap()
+        address.typeText("http://127.0.0.1:8765/generic/\n")
+        for _ in 0..<4 {
+            if app.buttons["source-rule-save"].exists && app.buttons["source-rule-save"].isHittable { break }
+            app.swipeUp()
+        }
+        app.buttons["source-rule-save"].tap()
+        // The editor pops back to the source and the saved override reloads it.
+        XCTAssertTrue(app.staticTexts["通用规则样片"].waitForExistence(timeout: 10))
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["通用规则样片"].waitForExistence(timeout: 10))
+        capture("30-generic-rule-persisted")
     }
 
     private func imageRequests(_ key: String) throws -> Int {

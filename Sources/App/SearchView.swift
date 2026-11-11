@@ -123,19 +123,6 @@ private struct SearchHit: Identifiable {
                     if hits.isEmpty && !searching && visibleResults.allSatisfy({ $0.error == nil }) {
                         Text("没有找到匹配内容，可以换个关键词或切换来源。").font(.subheadline).foregroundStyle(.secondary)
                     }
-                    ForEach(visibleResults.filter { $0.error != nil }) { result in
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text(Theme.sourceName(result.site.name)).font(.caption.weight(.semibold))
-                            Text(result.error ?? "").font(.caption).foregroundStyle(.secondary)
-                            HStack {
-                                Button("重试") { retry(result.target) }
-                                if result.site.nativeAdapter == .auete {
-                                    Button("网页验证") { verificationTarget = result.target; verifyingSource = true }
-                                }
-                            }.font(.caption)
-                        }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 12))
-                    }
                     ForEach(hits) { hit in
                         NavigationLink { VideoDetailView(site: hit.site, video: hit.video) } label: {
                             HStack(alignment: .top, spacing: 11) {
@@ -148,6 +135,22 @@ private struct SearchHit: Identifiable {
                                 Spacer(minLength: 0)
                             }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                         }.buttonStyle(.plain).accessibilityIdentifier("search-hit-\(hit.id)")
+                    }
+                    ForEach(visibleResults.filter { $0.error != nil }) { result in
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(Theme.sourceName(result.site.name)).font(.caption.weight(.semibold))
+                            Text(result.error ?? "").font(.caption).foregroundStyle(.secondary)
+                            HStack {
+                                Button("重试") { retry(result.target) }
+                                if result.site.usesGenericAdapter {
+                                    NavigationLink("来源规则") { SourceRuleEditor(site: result.site) }
+                                }
+                                if result.site.nativeAdapter == .auete {
+                                    Button("网页验证") { verificationTarget = result.target; verifyingSource = true }
+                                }
+                            }.font(.caption)
+                        }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Theme.panel, in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
             }.padding(13)

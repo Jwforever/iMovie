@@ -68,6 +68,7 @@ final class AppStore: ObservableObject {
         defer { importing = false }
         do {
             var result = try await client.config(at: configURL)
+            persist(result, key: "importedConfig")
             for index in result.sites.indices {
                 if let rule = sourceRules[result.sites[index].key] { result.sites[index].genericRule = rule }
             }
@@ -82,7 +83,8 @@ final class AppStore: ObservableObject {
         sourceRules[site.key] = rule
         persist(sourceRules, key: "sourceRules")
         if var config, let index = config.sites.firstIndex(where: { $0.key == site.key }) {
-            config.sites[index].genericRule = rule
+            let imported = Self.load(SourceConfig.self, key: "importedConfig", defaults: defaults)
+            config.sites[index].genericRule = rule ?? imported?.sites.first { $0.key == site.key }?.genericRule
             self.config = config
             persist(config, key: "config")
         }
