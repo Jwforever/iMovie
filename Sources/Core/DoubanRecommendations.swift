@@ -45,7 +45,10 @@ public struct DoubanRecommendations {
                   let rating = row["rating"] as? [String: Any],
                   let value = rating["value"] as? Double, value >= 7, value <= 10,
                   JSONValue.integer(rating["count"]) >= 100 else { return nil }
-            return DoubanRecommendation(id: id, title: title, poster: (row["cover"] as? [String: Any])?["url"] as? String ?? "", rating: value,
+            let pictures = row["pic"] as? [String: Any]
+            let poster = (row["cover"] as? [String: Any])?["url"] as? String
+                ?? row["cover_url"] as? String ?? pictures?["large"] as? String ?? pictures?["normal"] as? String ?? ""
+            return DoubanRecommendation(id: id, title: title, poster: poster, rating: value,
                                         votes: JSONValue.integer(rating["count"]), subtitle: JSONValue.text(row["card_subtitle"]))
         }.sorted { $0.rating == $1.rating ? $0.votes > $1.votes : $0.rating > $1.rating }
     }

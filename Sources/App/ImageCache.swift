@@ -32,6 +32,10 @@ actor ImageCache {
         let task = Task<Data, Error> {
             var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 25)
             request.setValue(HTMLSourceAdapter.userAgent, forHTTPHeaderField: "User-Agent")
+            let host = url.host?.lowercased() ?? ""
+            if host == "doubanio.com" || host.hasSuffix(".doubanio.com") {
+                request.setValue("https://m.douban.com/", forHTTPHeaderField: "Referer")
+            }
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
                   !data.isEmpty, data.count <= 12 * 1024 * 1024, UIImage(data: data) != nil else {

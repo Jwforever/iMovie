@@ -43,6 +43,11 @@ final class PlaybackSearchTests: XCTestCase {
         XCTAssertFalse(DoubanRecommendations.matches("星际穿越", video: video))
     }
 
+    func testDoubanProductionPosterFieldsAndFallbacks() throws {
+        let data = Data(#"{"subject_collection_items":[{"id":"1","title":"封面字段","cover_url":"https://img.example.test/one.jpg","rating":{"value":9.5,"count":1000}},{"id":"2","title":"图片字段","pic":{"large":"https://img.example.test/two.jpg","normal":"https://img.example.test/two-small.jpg"},"rating":{"value":9.4,"count":1000}},{"id":"3","title":"旧版字段","cover":{"url":"https://img.example.test/three.jpg"},"rating":{"value":9.3,"count":1000}}]}"#.utf8)
+        XCTAssertEqual(try DoubanRecommendations.decode(data).map(\.poster), ["https://img.example.test/one.jpg", "https://img.example.test/two.jpg", "https://img.example.test/three.jpg"])
+    }
+
     func testFirstAidCatalogSearchAndPublicEpisode() throws {
         let html = #"<div class="jj-title-li"><div class="list-br3"><a href="/jijiu/article/sample.html">人工呼吸</a><a href="https://ad.example.test/jijiu/article/sample.html">广告</a></div></div>"#
         let page = try FirstAidAdapter.decodePage(Data(html.utf8), category: "0", search: "呼吸")
