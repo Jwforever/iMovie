@@ -49,7 +49,8 @@ public struct TVAPIClient {
     }
 
     public func resolve(site: SourceSite, episode: Episode, flag: String, title: String) async throws -> MediaLink {
-        var media = try await resolveLink(site: site, episode: episode, flag: flag, title: title)
+        let candidate = try await resolveLink(site: site, episode: episode, flag: flag, title: title)
+        var media = try await MediaResolver().resolve(candidate)
         media.reference = PlaybackReference(site: site, episode: episode, flag: flag)
         return media
     }
@@ -66,19 +67,18 @@ public struct TVAPIClient {
             return MediaLink(title: title, url: episode.value, group: site.name)
         }
         guard site.type == 4 else {
-            throw ViewerError.message("这条线路没有返回可直接播放的媒体地址。网页解析、网盘登录和磁力下载尚未实现。")
+            let url = try HTTPAddress.parse(episode.value)
+            return MediaLink(title: title, url: url.absoluteString, group: site.name, kind: .web)
         }
         let root = try await object(site: site, query: ["play": episode.value, "flag": flag])
-        guard JSONValue.integer(root["parse"]) == 0, JSONValue.integer(root["jx"]) == 0 else {
-            throw ViewerError.message("这条线路需要网页解析，当前版本尚未适配。")
-        }
         let url = try HTTPAddress.parse(JSONValue.text(root["url"]))
         var headers = root["header"] as? [String: String] ?? [:]
         if let string = root["header"] as? String, let data = string.data(using: .utf8),
            let dictionary = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
             headers = dictionary
         }
-        return MediaLink(title: title, url: url.absoluteString, headers: headers, group: site.name)
+        let needsResolution = JSONValue.integer(root["parse"]) != 0 || JSONValue.integer(root["jx"]) != 0
+        return MediaLink(title: title, url: url.absoluteString, headers: headers, group: site.name, kind: needsResolution ? .web : .direct)
     }
 
     private func object(site: SourceSite, query: [String: String]) async throws -> [String: Any] {

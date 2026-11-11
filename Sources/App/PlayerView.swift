@@ -6,15 +6,69 @@ final class PlaybackController: ObservableObject {
     let player = AVPlayer()
     @Published var error: String?
     @Published private(set) var isPlaying = false
+    @Published private(set) var hasVideoFrame = false
+    @Published private(set) var elapsed = 0.0
+    @Published private(set) var media: MediaLink?
+    @Published private(set) var resolving = false
+    let sessionID = UUID().uuidString
+    var onProgress: ((MediaLink, Double) -> Void)?
     private var observation: NSKeyValueObservation?
     private var timeControlObservation: NSKeyValueObservation?
     private var failureObserver: NSObjectProtocol?
     private var resume = 0.0
+    private var progressObserver: Any?
+    private var resolutionTask: Task<Void, Never>?
+    private var generation = UUID()
+    private var shouldPlay = false
 
-    func open(_ media: MediaLink, resume: Double) {
+    init() {
+        progressObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] time in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.elapsed = time.seconds.isFinite ? max(0, time.seconds) : 0
+                if let media = self.media { self.onProgress?(media, self.position) }
+            }
+        }
+    }
+
+    func select(site: SourceSite, episode: Episode, flag: String, title: String, resume: @escaping (MediaLink) -> Double) {
+        beginResolution {
+            let media = try await TVAPIClient().resolve(site: site, episode: episode, flag: flag, title: title)
+            return (media, resume(media))
+        }
+    }
+
+    func prepare(_ source: MediaLink, resume: Double, force: Bool = false) {
+        guard force || media?.id != source.id || player.currentItem == nil else { return }
+        beginResolution { (try await MediaResolver().resolve(source), resume) }
+    }
+
+    private func beginResolution(_ operation: @escaping @MainActor () async throws -> (MediaLink, Double)) {
         stop()
         error = nil
+        resolving = true
+        let token = generation
+        resolutionTask = Task {
+            do {
+                let (media, resume) = try await operation()
+                guard generation == token, !Task.isCancelled else { return }
+                resolving = false
+                open(media, resume: resume)
+            } catch is CancellationError { }
+            catch {
+                guard generation == token, !Task.isCancelled else { return }
+                resolving = false
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    func open(_ media: MediaLink, resume: Double) {
+        clearItem()
+        error = nil
         self.resume = resume
+        self.media = media
+        shouldPlay = true
         do {
             let url = try HTTPAddress.parse(media.url)
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
@@ -45,6 +99,7 @@ final class PlaybackController: ObservableObject {
             }
             player.replaceCurrentItem(with: item)
             player.allowsExternalPlayback = true
+            onProgress?(media, resume)
             timeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] _, _ in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
@@ -54,6 +109,13 @@ final class PlaybackController: ObservableObject {
         } catch { self.error = error.localizedDescription }
     }
 
+    func rendered(_ ready: Bool) { hasVideoFrame = ready }
+
+    func resumeAfterTransition(wasPlaying: Bool) {
+        guard wasPlaying, shouldPlay, player.currentItem?.status == .readyToPlay else { return }
+        player.play()
+    }
+
     var position: Double {
         guard let duration = player.currentItem?.duration.seconds, duration.isFinite else { return 0 }
         let current = player.currentTime().seconds
@@ -61,9 +123,22 @@ final class PlaybackController: ObservableObject {
     }
 
     func stop() {
+        generation = UUID()
+        resolutionTask?.cancel()
+        resolutionTask = nil
+        resolving = false
+        shouldPlay = false
+        if let media { onProgress?(media, position) }
+        clearItem()
+        media = nil
+    }
+
+    private func clearItem() {
         observation = nil
         timeControlObservation = nil
         isPlaying = false
+        hasVideoFrame = false
+        elapsed = 0
         if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
         failureObserver = nil
         player.pause()
@@ -71,25 +146,80 @@ final class PlaybackController: ObservableObject {
     }
 
     deinit {
+        resolutionTask?.cancel()
         if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
+        if let progressObserver { player.removeTimeObserver(progressObserver) }
+        player.pause()
     }
 }
 
 @MainActor struct NativeVideoPlayer: UIViewControllerRepresentable {
-    let player: AVPlayer
+    @ObservedObject var playback: PlaybackController
+
+    func makeCoordinator() -> Coordinator { Coordinator(playback: playback) }
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
+        let controller = PersistentPlayerViewController()
+        controller.playback = playback
+        controller.player = playback.player
         controller.allowsPictureInPicturePlayback = true
         controller.canStartPictureInPictureAutomaticallyFromInline = true
         controller.entersFullScreenWhenPlaybackBegins = false
         controller.showsPlaybackControls = true
+        controller.speeds = []
+        controller.delegate = context.coordinator
+        context.coordinator.observation = controller.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak playback] controller, _ in
+            let ready = controller.isReadyForDisplay
+            Task { @MainActor in playback?.rendered(ready) }
+        }
         return controller
     }
 
     func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
-        if controller.player !== player { controller.player = player }
+        if controller.player !== playback.player { controller.player = playback.player }
+    }
+
+    @MainActor final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        weak var playback: PlaybackController?
+        var observation: NSKeyValueObservation?
+        init(playback: PlaybackController) { self.playback = playback }
+
+        func playerViewController(_ playerViewController: AVPlayerViewController, willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            let playing = playback?.isPlaying == true
+            coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+                Task { @MainActor in self?.playback?.resumeAfterTransition(wasPlaying: playing) }
+            }
+        }
+    }
+}
+
+@MainActor private final class PersistentPlayerViewController: AVPlayerViewController {
+    weak var playback: PlaybackController?
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        let playing = playback?.isPlaying == true
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+            self?.view.setNeedsLayout()
+            Task { @MainActor in self?.playback?.resumeAfterTransition(wasPlaying: playing) }
+        }
+    }
+}
+
+@MainActor struct PlaybackSurface: View {
+    @ObservedObject var controller: PlaybackController
+    var body: some View {
+        NativeVideoPlayer(playback: controller)
+            .aspectRatio(16.0 / 9.0, contentMode: .fit).background(.black)
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .accessibilityIdentifier("native-player")
+            .accessibilityValue(controller.isPlaying ? "playing" : "waiting")
+            .overlay(alignment: .bottomLeading) {
+                Color.clear.frame(width: 1, height: 1)
+                    .accessibilityElement().accessibilityLabel("播放会话")
+                    .accessibilityValue("\(controller.sessionID)|\(Int(controller.elapsed))|\(controller.hasVideoFrame ? "frame" : "waiting")")
+                    .accessibilityIdentifier("playback-session")
+                    .allowsHitTesting(false)
+            }
     }
 }
 
@@ -104,11 +234,8 @@ final class PlaybackController: ObservableObject {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    NativeVideoPlayer(player: controller.player)
-                        .aspectRatio(16.0 / 9.0, contentMode: .fit).background(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 15))
-                        .accessibilityIdentifier("native-player")
-                        .accessibilityValue(controller.isPlaying ? "playing" : "waiting")
+                    if controller.resolving { ProgressView("正在提取视频链接…") }
+                    PlaybackSurface(controller: controller)
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(media.title).font(.title3.bold())
@@ -121,27 +248,20 @@ final class PlaybackController: ObservableObject {
                     }
                     if let error = controller.error {
                         Text(error).font(.subheadline).foregroundStyle(.orange)
-                        Button("重新连接") { controller.open(media, resume: 0) }.buttonStyle(.bordered)
-                    }
-                    HStack(spacing: 12) {
-                        ForEach([0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
-                            Button("\(rate.formatted())×") { controller.player.rate = Float(rate) }
-                                .font(.caption).buttonStyle(.bordered)
-                        }
+                        Button("重新连接") { controller.prepare(media, resume: controller.position, force: true) }.buttonStyle(.bordered)
                     }
                     Text("全屏、投屏和画中画可通过播放器控件开启。").font(.caption).foregroundStyle(.secondary)
                 }.padding(20)
             }
             .background(Theme.backdrop)
             .navigationTitle("正在播放").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("完成") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("完成") { controller.stop(); dismiss() } } }
         }
-        .onAppear {
+        .task {
             let position = store.position(for: media)
-            controller.open(media, resume: position)
-            store.record(media, position: position)
+            controller.onProgress = { [weak store] in store?.record($0, position: $1) }
+            controller.prepare(media, resume: position)
         }
-        .onDisappear { store.record(media, position: controller.position); controller.stop() }
         .onChange(of: scenePhase) { phase in
             if phase != .active { store.record(media, position: controller.position) }
         }

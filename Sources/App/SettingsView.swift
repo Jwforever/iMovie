@@ -33,14 +33,16 @@ import SwiftUI
                 }
             }
             Section("播放器") {
-                Label("系统播放器 · 倍速 · AirPlay · 画中画", systemImage: "play.rectangle")
+                Label("详情页内播放 · AirPlay · 画中画", systemImage: "play.rectangle")
                     .font(.subheadline)
                 Text("支持 AVPlayer 可解码的格式，通常包括 HLS、MP4。部分 TS、MKV、网页链接及特殊音视频编码需要额外适配。")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("iMovie 0.3.0") {
+            Section("iMovie") {
                 Text("收藏和播放记录保存在本机。配置和媒体由你提供，应用不附带影片库。")
                     .font(.subheadline).foregroundStyle(.secondary)
+                NavigationLink { AboutView() } label: { Label("关于 iMovie", systemImage: "info.circle") }
+                    .accessibilityIdentifier("settings-about")
                 NavigationLink("开源组件许可") {
                     ScrollView {
                         Text(Self.notices).font(.caption.monospaced()).textSelection(.enabled).padding(20)
@@ -56,6 +58,42 @@ import SwiftUI
         guard let url = Bundle.main.url(forResource: "ThirdPartyNotices", withExtension: "txt"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return "SwiftSoup · MIT License" }
         return text
+    }
+}
+
+@MainActor struct AboutView: View {
+    private var version: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        return "\(info["CFBundleShortVersionString"] as? String ?? "") (\(info["CFBundleVersion"] as? String ?? ""))"
+    }
+    var body: some View {
+        Form {
+            Section {
+                VStack(spacing: 14) {
+                    Image(systemName: "play.rectangle.fill").font(.system(size: 64)).foregroundStyle(Theme.accent)
+                    Text("iMovie").font(.largeTitle.bold())
+                    Text("在你的设备上，发现与播放喜欢的内容。")
+                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Text("by Chris Wei").font(.headline).accessibilityIdentifier("about-developer")
+                }.frame(maxWidth: .infinity).padding(.vertical, 22)
+            }
+            Section("软件介绍") {
+                Text("iMovie 是为 iPhone 和 iPad 开发的媒体播放器，支持导入 TVBox 配置、浏览分类、聚合搜索、豆瓣高分推荐、选集播放、收藏与播放记录。")
+                Text("来源请求与视频链接提取在设备内完成，使用 AVPlayer 播放，无需 Android 设备或自建解析服务。不同来源的可用性取决于网站、网络及适配情况。")
+                    .foregroundStyle(.secondary)
+            }
+            Section("项目信息") {
+                LabeledContent("版本", value: version)
+                LabeledContent("开发者", value: "Chris Wei")
+                Link(destination: URL(string: "https://github.com/Jwforever/iMovie")!) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("GitHub 项目", systemImage: "link")
+                        Text("github.com/Jwforever/iMovie").font(.caption).foregroundStyle(.secondary)
+                    }
+                }.accessibilityIdentifier("about-github")
+            }
+        }.scrollContentBackground(.hidden).background(Theme.backdrop)
+            .navigationTitle("关于 iMovie").navigationBarTitleDisplayMode(.inline)
     }
 }
 

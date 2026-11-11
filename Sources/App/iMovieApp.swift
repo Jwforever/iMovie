@@ -42,8 +42,7 @@ enum Theme {
                 .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
         }
         .sheet(item: $store.playback) { request in
-            if request.media.kind == .web { WebPlayerSheet(media: request.media).environmentObject(store) }
-            else { PlayerSheet(media: request.media).environmentObject(store) }
+            PlayerSheet(media: request.media).environmentObject(store)
         }
         .overlay {
             if store.resolvingPlayback {

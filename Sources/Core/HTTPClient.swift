@@ -11,6 +11,19 @@ public struct HTTPClient {
         request.setValue("okhttp/4.12.0", forHTTPHeaderField: "User-Agent")
         request.setValue("application/json,text/plain,*/*", forHTTPHeaderField: "Accept")
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        return try await data(for: request)
+    }
+
+    public func post(to url: URL, json: [String: Any], headers: [String: String] = [:]) async throws -> Data {
+        var request = URLRequest(url: url, timeoutInterval: 25)
+        request.httpMethod = "POST"
+        request.httpBody = try JSONSerialization.data(withJSONObject: json)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        return try await data(for: request).0
+    }
+
+    private func data(for request: URLRequest) async throws -> (Data, URL) {
         let (data, response) = try await fetch(request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -24,7 +37,7 @@ public struct HTTPClient {
         let transient: Set<URLError.Code> = [.networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .timedOut]
         for attempt in 0...1 {
             do { return try await URLSession.shared.data(for: request) }
-            catch let error as URLError where attempt == 0 && transient.contains(error.code) {
+            catch let error as URLError where attempt == 0 && request.httpMethod != "POST" && transient.contains(error.code) {
                 try Task.checkCancellation()
                 try await Task.sleep(nanoseconds: 400_000_000)
             }

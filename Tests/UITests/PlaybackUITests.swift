@@ -9,6 +9,7 @@ final class PlaybackUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launchEnvironment["IMOVIE_DEFAULTS_SUITE"] = "local.imovie.tests.\(UUID().uuidString)"
         app.launchEnvironment["IMOVIE_CONFIG_URL"] = "http://127.0.0.1:8765/tv"
+        app.launchEnvironment["IMOVIE_DOUBAN_URL"] = "http://127.0.0.1:8765/douban"
         app.launch()
     }
 
@@ -25,12 +26,13 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["播放验证样片"].waitForExistence(timeout: 10))
         app.staticTexts["播放验证样片"].firstMatch.tap()
         XCTAssertTrue(app.buttons["第 1 集"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "native-player").firstMatch.exists)
         capture("02-episodes")
         app.buttons["第 1 集"].tap()
         assertPlaying()
         capture("03-native-playing")
         app.buttons["收藏"].tap()
-        app.buttons["完成"].tap()
+        app.buttons["detail-back"].tap()
         app.tabBars.buttons["我的"].tap()
         XCTAssertTrue(app.staticTexts["播放验证样片 · 第 1 集"].firstMatch.waitForExistence(timeout: 5))
         capture("04-bookmark")
@@ -40,12 +42,11 @@ final class PlaybackUITests: XCTestCase {
         app.segmentedControls.buttons["播放记录"].tap()
         XCTAssertTrue(app.staticTexts["播放验证样片 · 第 1 集"].firstMatch.exists)
         app.tabBars.buttons["首页"].tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["最近播放"].waitForExistence(timeout: 5))
         capture("12-home-with-recent")
     }
 
-    func testWebPageFindsMediaAndOpensSystemPlayer() throws {
+    func testHTTPExtractionAutomaticallyPlaysWithoutWebPage() throws {
         app.buttons["home-open-link"].tap()
         let webMode = app.switches["library-web-mode"]
         webMode.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
@@ -53,11 +54,10 @@ final class PlaybackUITests: XCTestCase {
         let address = app.textFields["library-direct-url"]
         address.tap()
         address.typeText("http://127.0.0.1:8765/web\n")
-        XCTAssertTrue(app.buttons["系统播放"].waitForExistence(timeout: 15))
-        capture("05-web-media-detected")
-        app.buttons["系统播放"].tap()
         assertPlaying()
-        capture("06-web-to-native-playing")
+        XCTAssertEqual(app.webViews.count, 0)
+        XCTAssertFalse(app.buttons["系统播放"].exists)
+        capture("06-http-to-native-playing")
     }
 
     func testUserConfigAndDM84WebMedia() throws {
@@ -100,10 +100,8 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(episode.waitForExistence(timeout: 35))
         capture("09-dm84-episodes")
         episode.tap()
-        XCTAssertTrue(app.buttons["系统播放"].waitForExistence(timeout: 45))
-        capture("10-dm84-web-media-detected")
-        app.buttons["系统播放"].tap()
         assertPlaying()
+        XCTAssertEqual(app.webViews.count, 0)
         capture("11-dm84-system-playing")
     }
 
@@ -134,6 +132,14 @@ final class PlaybackUITests: XCTestCase {
         expectation(for: completed, evaluatedWith: summary)
         waitForExpectations(timeout: 10)
         capture("20-global-search-results")
+        let hits = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "search-hit-"))
+        XCTAssertEqual(hits.element(boundBy: 0).identifier, "search-hit-fixture-two|exact")
+        app.buttons["search-filter-fixture"].tap()
+        XCTAssertTrue(app.buttons["search-hit-fixture|exact"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["search-hit-fixture-two|exact"].exists)
+        capture("22-global-search-filtered")
+        app.buttons["search-filter-all"].tap()
+        XCTAssertTrue(app.buttons["search-hit-fixture-two|exact"].waitForExistence(timeout: 5))
     }
 
     func testAueteBrowseEpisodesAndSearchVerification() throws {
@@ -165,16 +171,10 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(app.buttons["第1集"].firstMatch.waitForExistence(timeout: 30))
         capture("16-auete-episodes")
         app.buttons["第1集"].firstMatch.tap()
-        let native = app.descendants(matching: .any).matching(identifier: "native-player").firstMatch
-        if !native.waitForExistence(timeout: 12) {
-            XCTAssertTrue(app.buttons["系统播放"].waitForExistence(timeout: 40))
-            capture("17-auete-web-media")
-            app.buttons["系统播放"].tap()
-        }
         assertPlaying()
+        XCTAssertEqual(app.webViews.count, 0)
         capture("18-auete-system-playing")
-        app.buttons["完成"].tap()
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["detail-back"].tap()
         query.tap()
         query.typeText("折月亮\n")
         let status = app.staticTexts["折月亮"].firstMatch
@@ -190,12 +190,73 @@ final class PlaybackUITests: XCTestCase {
         }
     }
 
+    func testWholePosterTapTargetsAndLazyEmbeddedPlaybackSurviveRotation() throws {
+        app.tabBars.buttons["设置"].tap()
+        app.buttons["config-import"].tap()
+        XCTAssertTrue(app.staticTexts["兼容情况"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["首页"].tap()
+        let card = app.buttons["video-card-1"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        app.swipeUp()
+        for point in [CGVector(dx: 0.12, dy: 0.12), CGVector(dx: 0.85, dy: 0.12), CGVector(dx: 0.5, dy: 0.4), CGVector(dx: 0.12, dy: 0.65)] {
+            card.coordinate(withNormalizedOffset: point).tap()
+            XCTAssertTrue(app.buttons["episode-第 1 集"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "native-player").firstMatch.exists)
+            app.buttons["detail-back"].tap()
+        }
+        card.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
+        app.buttons["episode-第 1 集"].tap()
+        assertPlaying()
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "detail-introduction").firstMatch.exists)
+        let session = app.descendants(matching: .any).matching(identifier: "playback-session").firstMatch
+        XCTAssertTrue(session.waitForExistence(timeout: 5))
+        let before = (session.value as? String ?? "").components(separatedBy: "|")
+        XCTAssertEqual(before.count, 3)
+        for orientation in [UIDeviceOrientation.landscapeLeft, .portrait, .landscapeRight, .portrait] {
+            XCUIDevice.shared.orientation = orientation
+            assertPlaying()
+            let after = (session.value as? String ?? "").components(separatedBy: "|")
+            XCTAssertEqual(after.first, before.first, "旋转不能更换播放会话")
+            let advanced = NSPredicate { _, _ in
+                let value = (session.value as? String ?? "").components(separatedBy: "|")
+                return value.count == 3 && value[2] == "frame" && (Int(value[1]) ?? 0) > (Int(after[1]) ?? 0)
+            }
+            expectation(for: advanced, evaluatedWith: nil)
+            waitForExpectations(timeout: 8)
+            capture(orientation == .portrait ? "24-inline-portrait" : "23-inline-landscape")
+        }
+        XCTAssertFalse(app.buttons["1.25×"].exists)
+        app.buttons["detail-back"].tap()
+    }
+
+    func testRecommendationCarouselAndAbout() throws {
+        app.tabBars.buttons["设置"].tap()
+        app.buttons["config-import"].tap()
+        XCTAssertTrue(app.staticTexts["兼容情况"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["首页"].tap()
+        let first = app.buttons["recommendation-10001"]
+        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        capture("25-douban-carousel")
+        first.swipeLeft()
+        XCTAssertTrue(app.buttons["recommendation-10002"].waitForExistence(timeout: 5))
+        app.buttons["recommendation-10002"].swipeRight()
+        first.tap()
+        XCTAssertTrue(app.buttons["episode-第 1 集"].waitForExistence(timeout: 5))
+        app.buttons["detail-back"].tap()
+        app.tabBars.buttons["设置"].tap()
+        app.swipeUp()
+        app.buttons["settings-about"].tap()
+        XCTAssertTrue(app.staticTexts["by Chris Wei"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.links["about-github"].exists || app.buttons["about-github"].exists)
+        capture("26-about-imovie")
+    }
+
     private func assertPlaying() {
         let player = app.descendants(matching: .any).matching(identifier: "native-player").firstMatch
         XCTAssertTrue(player.waitForExistence(timeout: 10))
         let predicate = NSPredicate(format: "value == %@", "playing")
         expectation(for: predicate, evaluatedWith: player)
-        waitForExpectations(timeout: 20)
+        waitForExpectations(timeout: 55)
     }
 
     private func capture(_ name: String) {

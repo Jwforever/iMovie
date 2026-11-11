@@ -47,7 +47,12 @@ def handler(media: bytes):
                 video = {"vod_id": "1", "vod_name": "第二来源样片" if parsed.path == "/api-two" else "播放验证样片", "vod_pic": "", "vod_remarks": "本地生成 · 测试视频",
                          "vod_content": "这是自动化测试生成的色彩动画，用于验证选集、播放器、收藏和记录。",
                          "vod_play_from": "本机播放", "vod_play_url": "第 1 集$" + origin + "/sample.mp4#第 2 集$" + origin + "/sample.mp4?episode=2"}
-                payload = {"class": [{"type_id": "1", "type_name": "测试分类"}], "list": [video], "page": 1, "pagecount": 1}
+                videos = [video]
+                if query.get("wd") == ["样片"]:
+                    videos = [{**video, "vod_id": "weak", "vod_name": "无关花絮"}, video,
+                              {**video, "vod_id": "prefix", "vod_name": "样片 第二季"},
+                              {**video, "vod_id": "exact", "vod_name": "样片"}]
+                payload = {"class": [{"type_id": "1", "type_name": "测试分类"}], "list": videos, "page": 1, "pagecount": 1}
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                 content_type = "application/json; charset=utf-8"
                 self.send_response(200)
@@ -61,6 +66,14 @@ def handler(media: bytes):
                         "<h2>网页播放验证</h2><p>本地测试视频</p><video controls playsinline preload='metadata' style='width:100%' src='/sample.mp4'></video>"
                         "</body></html>").encode("utf-8")
                 content_type = "text/html; charset=utf-8"
+                self.send_response(200)
+            elif parsed.path == "/douban":
+                payload = {"subject_collection_items": [
+                    {"id": "10001", "title": "播放验证样片", "cover": {}, "rating": {"value": 9.5, "count": 1200}, "card_subtitle": "测试榜单 · 仅用于回归"},
+                    {"id": "10002", "title": "第二来源样片", "cover": {}, "rating": {"value": 8.7, "count": 2400}, "card_subtitle": "测试榜单 · 仅用于回归"},
+                    {"id": "10003", "title": "样片", "cover": {}, "rating": {"value": 8.2, "count": 3500}, "card_subtitle": "测试榜单 · 仅用于回归"}]}
+                body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                content_type = "application/json; charset=utf-8"
                 self.send_response(200)
             else:
                 self.send_error(404)

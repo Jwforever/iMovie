@@ -113,7 +113,7 @@ import SwiftUI
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                         .accessibilityIdentifier("library-direct-url")
                         .onSubmit { playDirect() }
-                    Toggle("使用内置网页播放器", isOn: $openAsWebPage)
+                    Toggle("从网页地址提取视频链接", isOn: $openAsWebPage)
                         .font(.subheadline).accessibilityIdentifier("library-web-mode")
                     Button(action: playDirect) {
                         Label("开始播放", systemImage: "play.fill").frame(maxWidth: .infinity)
@@ -150,6 +150,11 @@ import SwiftUI
     @State private var error: String?
     @State private var requestToken = UUID()
     @State private var verifyingSource = false
+    @State private var recommendations: [DoubanRecommendation] = []
+    @State private var recommendationError: String?
+    @State private var recommendationSelection: Video?
+    @State private var showingRecommendation = false
+    @State private var lookingUpRecommendation = false
     private let client = TVAPIClient()
     private var isHome: Bool { category.isEmpty && activeSearch.isEmpty }
 
@@ -170,10 +175,8 @@ import SwiftUI
                     LazyVStack(alignment: .leading, spacing: 22, pinnedViews: [.sectionHeaders]) {
                       Section {
                         if isHome { recentSection }
-                        if isHome, let featured = videos.first, error == nil {
-                            NavigationLink { VideoDetailView(site: site, video: featured) } label: {
-                                FeaturedVideoCard(video: featured, source: Theme.sourceName(site.name))
-                            }.buttonStyle(.plain)
+                        if isHome, error == nil, !videos.isEmpty {
+                            recommendationCarousel
                         }
                         HStack {
                             Text(activeSearch.isEmpty ? (isHome ? "热播推荐" : (categories.first { $0.id == category }?.name ?? "全部内容")) : "搜索结果")
@@ -195,7 +198,9 @@ import SwiftUI
                         }
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 20) {
                             ForEach(videos) { video in
-                                NavigationLink { VideoDetailView(site: site, video: video) } label: { VideoPosterCard(video: video) }
+                                NavigationLink { VideoDetailView(site: site, video: video) } label: {
+                                    VideoPosterCard(video: video).contentShape(Rectangle())
+                                }
                                     .buttonStyle(.plain).accessibilityIdentifier("video-card-\(video.id)")
                             }
                         }
@@ -232,10 +237,76 @@ import SwiftUI
         .background(Theme.backdrop)
         .navigationTitle(embedded ? "" : Theme.sourceName(site.name)).navigationBarTitleDisplayMode(.inline)
         .task { if site.isNative && videos.isEmpty { await load(reset: true) } }
+        .task {
+            do { recommendations = try await DoubanRecommendations().fetch() }
+            catch { recommendations = [] }
+        }
+        .navigationDestination(isPresented: $showingRecommendation) {
+            if let video = recommendationSelection { VideoDetailView(site: site, video: video) }
+        }
+        .alert("推荐影片", isPresented: Binding(get: { recommendationError != nil }, set: { if !$0 { recommendationError = nil } })) {
+            Button("知道了", role: .cancel) { recommendationError = nil }
+        } message: { Text(recommendationError ?? "") }
         .sheet(isPresented: $verifyingSource, onDismiss: { Task { await load(reset: true) } }) {
             if let url = try? AueteAdapter.pageURL(category: category, search: activeSearch, page: 1) {
                 SourceVerificationView(url: url)
             }
+        }
+    }
+
+    @ViewBuilder private var recommendationCarousel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("今日推荐").font(.title3.bold())
+                Spacer()
+                if lookingUpRecommendation { ProgressView() }
+                Text(recommendations.isEmpty ? "来源推荐" : "豆瓣高分").font(.caption).foregroundStyle(.secondary)
+            }
+            TabView {
+                if recommendations.isEmpty {
+                    ForEach(Array(videos.prefix(6))) { video in
+                        NavigationLink { VideoDetailView(site: site, video: video) } label: {
+                            FeaturedVideoCard(video: video, source: Theme.sourceName(site.name)).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    }
+                } else {
+                    ForEach(Array(recommendations.prefix(6))) { item in
+                        Button { lookup(item) } label: {
+                            FeaturedVideoCard(video: Video(id: item.id, title: item.title, poster: item.poster, note: item.subtitle, summary: "", playFrom: "", playURL: ""),
+                                              source: "豆瓣 \(String(format: "%.1f", item.rating)) · \(item.votes) 人评价", rating: item.rating)
+                                .contentShape(Rectangle())
+                        }.buttonStyle(.plain).disabled(lookingUpRecommendation)
+                            .accessibilityIdentifier("recommendation-\(item.id)")
+                    }
+                }
+            }.tabViewStyle(.page(indexDisplayMode: .always)).frame(height: 240)
+                .accessibilityIdentifier("home-carousel")
+            if !recommendations.isEmpty {
+                Text("评分来自豆瓣公开榜单；点选后查找当前来源中的同名影片。")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func lookup(_ recommendation: DoubanRecommendation) {
+        if let video = videos.first(where: { DoubanRecommendations.matches(recommendation.title, video: $0) }) {
+            recommendationSelection = video
+            showingRecommendation = true
+            return
+        }
+        lookingUpRecommendation = true
+        Task {
+            defer { lookingUpRecommendation = false }
+            do {
+                let result = try await client.page(site: site, search: recommendation.title)
+                guard !Task.isCancelled else { return }
+                if let video = result.videos.first(where: { DoubanRecommendations.matches(recommendation.title, video: $0) }) {
+                    recommendationSelection = video
+                    showingRecommendation = true
+                } else {
+                    recommendationError = "当前来源没有找到“\(recommendation.title)”的同名影片，可以切换来源后再试。"
+                }
+            } catch { recommendationError = error.localizedDescription }
         }
     }
 
@@ -316,6 +387,7 @@ import SwiftUI
 @MainActor struct FeaturedVideoCard: View {
     let video: Video
     let source: String
+    var rating: Double? = nil
 
     var body: some View {
         Color.clear.frame(height: 215)
@@ -331,15 +403,17 @@ import SwiftUI
             }
             .overlay(alignment: .bottomLeading) {
                 VStack(alignment: .leading, spacing: 11) {
-                    Text("今日推荐").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
+                    Text(rating.map { "豆瓣 \(String(format: "%.1f", $0))" } ?? "今日推荐")
+                        .font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
                     Text(video.title).font(.system(size: 25, weight: .bold)).foregroundStyle(.white).lineLimit(2)
                         .frame(maxWidth: 230, alignment: .leading)
-                    Text(video.note.isEmpty ? source : video.note).font(.caption).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
-                    Label("立即观看", systemImage: "play.fill").font(.caption.bold()).foregroundStyle(Theme.backdrop)
+                    Text(rating == nil ? (video.note.isEmpty ? source : video.note) : source).font(.caption).foregroundStyle(.white.opacity(0.65)).lineLimit(2)
+                    Label(rating == nil ? "查看影片" : "查找片源", systemImage: "play.fill").font(.caption.bold()).foregroundStyle(Theme.backdrop)
                         .padding(.horizontal, 13).padding(.vertical, 9).background(Theme.accent, in: Capsule())
                 }.padding(21)
             }
             .clipShape(RoundedRectangle(cornerRadius: 22))
+            .contentShape(Rectangle())
             .accessibilityElement(children: .ignore).accessibilityLabel("今日推荐：\(video.title)")
             .accessibilityIdentifier("home-featured")
     }
@@ -361,6 +435,7 @@ import SwiftUI
             Text(video.title).font(.system(size: 13, weight: .medium)).foregroundStyle(.primary).lineLimit(2)
                 .frame(height: 34, alignment: .topLeading)
         }
+        .contentShape(Rectangle())
     }
 }
 
@@ -375,48 +450,89 @@ import SwiftUI
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height).clipped()
                 }
-                .allowsHitTesting(false).accessibilityHidden(true)
+                .accessibilityHidden(true)
             }
             .clipShape(RoundedRectangle(cornerRadius: 14))
+            .contentShape(Rectangle())
     }
 }
 
 @MainActor struct VideoDetailView: View {
     @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var playback = PlaybackController()
     let site: SourceSite
     let video: Video
     @State private var detail: Video?
     @State private var loading = false
-    @State private var resolving = false
+    @State private var selection: Episode?
+    @State private var selectedLine: String?
     @State private var error: String?
     private let client = TVAPIClient()
 
     var body: some View {
-        ScrollView {
+        ScrollViewReader { proxy in
+          ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                HStack(alignment: .top, spacing: 18) {
-                    PosterView(url: video.poster).frame(width: 120)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text((detail ?? video).title).font(.title2.bold())
-                        Text((detail ?? video).note).font(.subheadline).foregroundStyle(Theme.accent)
-                        Text(site.name).font(.caption).foregroundStyle(.secondary)
+                Group {
+                    if let selection {
+                        VStack(alignment: .leading, spacing: 12) {
+                            PlaybackSurface(controller: playback)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("\(video.title) · \(selection.title)").font(.headline)
+                                    Text(selectedLine ?? site.name).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if let media = playback.media {
+                                    Button { store.toggleFavorite(media) } label: {
+                                        Image(systemName: store.isFavorite(media) ? "bookmark.fill" : "bookmark")
+                                    }.accessibilityLabel(store.isFavorite(media) ? "取消收藏" : "收藏")
+                                }
+                            }
+                            if playback.resolving { ProgressView("正在提取视频链接…") }
+                            if let error = playback.error {
+                                Text(error).font(.subheadline).foregroundStyle(.orange)
+                                Button("重新获取播放链接") { play(selection, line: selectedLine ?? "") }.buttonStyle(.bordered)
+                            }
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 18) {
+                            HStack(alignment: .top, spacing: 18) {
+                                PosterView(url: (detail ?? video).poster).frame(width: 120)
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text((detail ?? video).title).font(.title2.bold())
+                                    Text((detail ?? video).note).font(.subheadline).foregroundStyle(Theme.accent)
+                                    Text(site.name).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            if !(detail ?? video).summary.isEmpty {
+                                Text((detail ?? video).summary).font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            Text("选择下方剧集开始播放").font(.caption).foregroundStyle(.secondary)
+                        }.accessibilityIdentifier("detail-introduction")
                     }
-                }
-                if loading || resolving { ProgressView(resolving ? "正在获取播放地址…" : "正在加载选集…") }
+                }.id("detail-top")
+                if loading { ProgressView("正在加载选集…") }
                 if let error {
                     Text(error).font(.subheadline).foregroundStyle(.orange)
                     Button("重新加载") { Task { await fetchDetail() } }.buttonStyle(.bordered)
                 }
                 if let detail {
-                    if !detail.summary.isEmpty { Text(detail.summary).font(.subheadline).foregroundStyle(.secondary) }
                     ForEach(detail.lines) { line in
                         VStack(alignment: .leading, spacing: 12) {
                             Text(line.name).font(.headline)
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 10) {
                                 ForEach(line.episodes) { episode in
-                                    Button(episode.title) { Task { await play(episode, line: line) } }
+                                    Button(episode.title) {
+                                        play(episode, line: line.name)
+                                        withAnimation { proxy.scrollTo("detail-top", anchor: .top) }
+                                    }
                                         .font(.caption).frame(maxWidth: .infinity, minHeight: 35)
-                                        .buttonStyle(.bordered).disabled(resolving)
+                                        .buttonStyle(.bordered)
+                                        .tint(selection?.id == episode.id && selectedLine == line.name ? Theme.accent : .secondary)
+                                        .accessibilityIdentifier("episode-\(episode.title)")
                                 }
                             }
                         }
@@ -424,12 +540,25 @@ import SwiftUI
                     if detail.lines.isEmpty { Text("该接口没有返回选集。\n可尝试其他来源。").foregroundStyle(.secondary) }
                 }
             }.padding(20)
+          }
         }
         .background(Theme.backdrop).navigationTitle("影片详情").navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden()
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { playback.stop(); dismiss() } label: { Label("返回", systemImage: "chevron.left") }
+                    .accessibilityIdentifier("detail-back")
+            }
+        }
+        .toolbar(selection == nil ? .visible : .hidden, for: .tabBar)
         .task { await fetchDetail() }
+        .onChange(of: scenePhase) { phase in
+            if phase != .active, let media = playback.media { store.record(media, position: playback.position) }
+        }
     }
 
     @MainActor private func fetchDetail() async {
+        guard detail == nil else { return }
         loading = true
         error = nil
         defer { loading = false }
@@ -438,14 +567,10 @@ import SwiftUI
         catch { self.error = error.localizedDescription }
     }
 
-    @MainActor private func play(_ episode: Episode, line: EpisodeLine) async {
-        resolving = true
-        defer { resolving = false }
-        do {
-            let link = try await client.resolve(site: site, episode: episode, flag: line.name, title: "\(video.title) · \(episode.title)")
-            guard !Task.isCancelled else { return }
-            store.play(link, refresh: false)
-        } catch is CancellationError { }
-        catch { store.error = error.localizedDescription }
+    @MainActor private func play(_ episode: Episode, line: String) {
+        selection = episode
+        selectedLine = line
+        playback.onProgress = { [weak store] in store?.record($0, position: $1) }
+        playback.select(site: site, episode: episode, flag: line, title: "\(video.title) · \(episode.title)", resume: { [weak store] in store?.position(for: $0) ?? 0 })
     }
 }
