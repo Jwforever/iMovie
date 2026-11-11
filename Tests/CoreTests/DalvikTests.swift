@@ -65,10 +65,10 @@ final class DalvikTests: XCTestCase {
             className: "Sample",
             strings: [],
             methods: [
-                "homeContent": ["https://www.example.com/"],
+                "homeContent": ["https://fixture-media.test/"],
                 "detailContent": ["div.card-header span b", "ul.episode-list li > a", "h1.detail-title"]
             ],
-            hosts: ["https://www.example.com"]
+            hosts: ["https://fixture-media.test"]
         )
         guard let rule = GuardRuleBuilder.rule(for: profile) else {
             return XCTFail("应该能生成规则")

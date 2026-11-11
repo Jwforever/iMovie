@@ -32,7 +32,7 @@ import SwiftUI
                     LabeledContent("更新于", value: config.importedAt.formatted(date: .abbreviated, time: .shortened))
                     NavigationLink("来源地址 / 通用规则") { SourceRulesView() }.accessibilityIdentifier("settings-source-rules")
                     NavigationLink("插件解释器（实验）") { PluginLabView() }.accessibilityIdentifier("settings-plugin-lab")
-                    Text("插件源不执行安卓代码：应用在设备内解开配置指定的 spider 包，从插件里读出站点域名与选择器，再按网页规则采集。域名变化只需重新导入配置，不用重装 App。")
+                    Text("插件源优先在设备内解释执行采集器，失败时使用插件中提取的网页规则。更新配置会重新校验插件并刷新规则。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -55,7 +55,7 @@ import SwiftUI
                         clearingCache = false
                     }
                 }.disabled(clearingCache).accessibilityIdentifier("clear-image-cache")
-                Text("图片缓存最多 120 MB，14 天更新；片库缓存 3 分钟，豆瓣推荐缓存 6 小时，合计最多 16 MB。搜索、配置导入和播放取址实时请求。清理不会删除收藏或播放记录。")
+                Text("图片缓存最多 120 MB，14 天更新；片库缓存 3 分钟，最多 16 MB。搜索、配置导入和播放取址实时请求。清理不会删除收藏或播放记录。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("iMovie") {
@@ -102,7 +102,7 @@ import SwiftUI
                 }.frame(maxWidth: .infinity).padding(.vertical, 22)
             }
             Section("软件介绍") {
-                Text("iMovie 是为 iPhone 和 iPad 开发的媒体播放器，支持导入 TVBox 配置、浏览分类、聚合搜索、豆瓣高分推荐、选集播放、收藏与播放记录。")
+                Text("iMovie 是为 iPhone 和 iPad 开发的媒体播放器，支持导入 TVBox 配置、浏览分类、聚合搜索、选集播放、收藏与播放记录。")
                 Text("来源请求与视频链接提取在设备内完成，使用 AVPlayer 播放，无需 Android 设备或自建解析服务。不同来源的可用性取决于网站、网络及适配情况。")
                     .foregroundStyle(.secondary)
             }

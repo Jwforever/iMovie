@@ -28,6 +28,22 @@ enum DalvikValue {
         return nil
     }
 
+    /// DEX 的零值既可以是整数 0，也可以是 null；非空引用不能转成整数比较。
+    var isZero: Bool {
+        if case .ref(let object) = self { return object == nil }
+        return intValue == 0
+    }
+
+    func equalsRegister(_ other: DalvikValue) -> Bool {
+        switch (self, other) {
+        case (.ref(let left), .ref(let right)): return left === right
+        case (.ref(let object), .int(let value)), (.int(let value), .ref(let object)):
+            return object == nil && value == 0
+        case (.long(let left), .long(let right)): return left == right
+        default: return equalsValue(other)
+        }
+    }
+
     var intValue: Int32 {
         switch self {
         case .int(let v): return v

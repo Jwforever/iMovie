@@ -18,9 +18,8 @@ public final class SpiderSource: @unchecked Sendable {
     }
 
     public func update(_ spider: String?) {
-        let resolved = GuardRuleCatalog.jarURL(from: spider)
         lock.lock()
-        value = resolved
+        value = spider
         lock.unlock()
     }
 }

@@ -13,6 +13,7 @@ struct PluginLabView: View {
     @State private var result: DalvikRunResult?
     @State private var failure: String?
     @State private var showRaw = false
+    @State private var work: Task<Void, Never>?
 
     private var sites: [SourceSite] { store.config?.nativeSites ?? [] }
     private var site: SourceSite? {
@@ -79,6 +80,7 @@ struct PluginLabView: View {
         .task {
             if selectedKey.isEmpty { selectedKey = store.homeSource?.key ?? sites.first?.key ?? "" }
         }
+        .onDisappear { work?.cancel() }
     }
 
     private func run(_ action: DalvikSpiderAction) {
@@ -87,16 +89,17 @@ struct PluginLabView: View {
         failure = nil
         result = nil
         let spider = store.config?.spider
-        Task {
+        work = Task {
+            defer { running = false }
             do {
                 let output = try await DalvikSpider.run(spider: spider, api: site.api,
                                                         action: action,
                                                         ext: site.extensionValue)
                 result = output
-            } catch {
+            } catch is CancellationError { }
+            catch {
                 failure = error.localizedDescription
             }
-            running = false
         }
     }
 }

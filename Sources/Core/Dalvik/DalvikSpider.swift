@@ -54,30 +54,14 @@ enum DalvikSpider {
         blockedUntil[api] = Date().addingTimeInterval(600)
     }
 
-    /// 插件 dex 的本地缓存（与规则解析共用同一个 jar 地址）。
-    static func dex(spider: String?) async throws -> Data {
-        guard let address = GuardRuleCatalog.jarURL(from: spider) else {
-            throw ViewerError.message("配置里没有 spider 插件地址。")
-        }
-        let url = try HTTPAddress.parse(address)
-        let cached = cacheFile(for: url)
-        if let data = try? Data(contentsOf: cached), GuardContainer.isDex([UInt8](data.prefix(4))) {
-            return data
-        }
-        let (archive, _) = try await HTTPClient().data(from: url, headers: ["Accept": "*/*"])
-        let inner = try GuardContainer.innerDex(from: archive)
-        try? FileManager.default.createDirectory(at: cached.deletingLastPathComponent(),
-                                                 withIntermediateDirectories: true)
-        try? inner.write(to: cached, options: .atomic)
-        return inner
+    static func resetFailures() {
+        lock.lock(); defer { lock.unlock() }
+        blockedUntil.removeAll()
     }
 
-    private static func cacheFile(for url: URL) -> URL {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        let name = url.lastPathComponent.isEmpty ? "spider.jar" : url.lastPathComponent
-        return base.appendingPathComponent("DalvikPlugins", isDirectory: true)
-            .appendingPathComponent(name + ".dex")
+    /// 与静态规则提取共用同一份经过校验的插件。
+    static func dex(spider: String?) async throws -> Data {
+        try await SpiderPluginCache.shared.dex(spider: spider)
     }
 
     /// 在后台执行采集器，返回插件自己产出的 JSON。
@@ -87,20 +71,26 @@ enum DalvikSpider {
         guard let short = GuardRuleCatalog.className(fromAPI: api) else {
             throw ViewerError.message("\(api) 不是插件采集器。")
         }
-        return try await Task.detached(priority: .userInitiated) {
-            try execute(dex: data, shortName: short, action: action, ext: ext ?? "")
-        }.value
+        let control = DalvikExecutionControl()
+        return try await withTaskCancellationHandler {
+            let result = try await Task.detached(priority: .userInitiated) {
+                try execute(dex: data, shortName: short, action: action, ext: ext ?? "", control: control)
+            }.value
+            try Task.checkCancellation()
+            return result
+        } onCancel: { control.cancel() }
     }
 
     static func execute(dex: Data, shortName: String, action: DalvikSpiderAction,
-                        ext: String) throws -> DalvikRunResult {
+                        ext: String, control: DalvikExecutionControl = DalvikExecutionControl()) throws -> DalvikRunResult {
+        try control.checkCancellation()
         let started = Date()
         let image = try DalvikImage(data: dex)
         let className = "Lcom/github/catvod/spider/\(shortName);"
         guard image.classes[className] != nil else {
             throw ViewerError.message("插件里没有 \(shortName) 这个采集器。")
         }
-        let vm = DalvikVM(image: image)
+        let vm = DalvikVM(image: image, control: control)
         let spider = DalvikObject(className: className)
 
         if let ctor = vm.findMethod(className, "<init>", []) {

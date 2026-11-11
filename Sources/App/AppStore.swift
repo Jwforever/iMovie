@@ -124,6 +124,8 @@ final class AppStore: ObservableObject {
         defer { importing = false }
         do {
             var result = try await client.config(at: configURL)
+            await GuardRuleCatalog.shared.refresh(spider: result.spider)
+            DalvikSpider.resetFailures()
             persist(result, key: "importedConfig")
             for index in result.sites.indices {
                 if let rule = sourceRules[result.sites[index].key] { result.sites[index].genericRule = rule }

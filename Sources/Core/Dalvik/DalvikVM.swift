@@ -15,13 +15,29 @@ final class DalvikVM {
     private var natives: [String: (DalvikVM, DalvikObject?, [DalvikValue]) throws -> DalvikValue] = [:]
     private var stackNames: [String] = []
     private var caught: DalvikValue = .ref(nil)
+    let control: DalvikExecutionControl
+    let httpSession: URLSession
+    private let maximumSteps: Int
+    private let deadline: TimeInterval
 
     /// 服务端请求记录，方便排查"为什么没内容"。
     private(set) var httpLog: [(url: String, code: Int)] = []
 
-    init(image: DalvikImage) {
+    init(image: DalvikImage, control: DalvikExecutionControl = DalvikExecutionControl(),
+         maximumSteps: Int = 20_000_000, timeout: TimeInterval = 45,
+         httpSession: URLSession = .shared) {
         self.image = image
+        self.control = control
+        self.maximumSteps = maximumSteps
+        self.deadline = ProcessInfo.processInfo.systemUptime + timeout
+        self.httpSession = httpSession
         DalvikNatives.install(self)
+    }
+
+    func checkExecution() throws {
+        try control.checkCancellation()
+        guard stepCount < maximumSteps else { throw DalvikError.runtime("插件执行超过指令上限。") }
+        guard ProcessInfo.processInfo.systemUptime < deadline else { throw DalvikError.runtime("插件执行超时。") }
     }
 
     func register(_ className: String, _ name: String,
@@ -85,11 +101,12 @@ final class DalvikVM {
     func ensureInitialized(_ className: String) throws {
         guard let info = classInfo(className), !info.initialized, !info.initializing else { return }
         info.initializing = true
+        defer { info.initializing = false }
+        for (key, value) in info.staticValues where statics[key] == nil { statics[key] = value }
         if let clinit = info.methods["<clinit>"]?.first {
             _ = try invoke(clinit, [], nil)
         }
         info.initialized = true
-        info.initializing = false
     }
 
     func staticValue(_ owner: String, _ name: String, _ type: String) throws -> DalvikValue {
@@ -110,6 +127,8 @@ final class DalvikVM {
 
     @discardableResult
     func invoke(_ method: DalvikMethod, _ args: [DalvikValue], _ this: DalvikObject?) throws -> DalvikValue? {
+        try checkExecution()
+        if method.isStatic { try ensureInitialized(method.owner) }
         callCount += 1
         guard method.codeOffset > 0 else {
             return try callNative(method, args, this)
@@ -189,7 +208,8 @@ final class DalvikVM {
         func s16(_ i: Int) -> Int { DalvikImage.s16(bytes, base + (pc + i) * 2) }
         func s32(_ i: Int) -> Int { DalvikImage.s32(bytes, base + (pc + i) * 2) }
 
-        while pc < code.size {
+        while pc >= 0 && pc < code.size {
+            if stepCount % 1024 == 0 { try checkExecution() }
             stepCount += 1
             let w = u(0)
             let op = w & 0xFF
@@ -220,7 +240,7 @@ final class DalvikVM {
                     registers[a8] = .long(Int64(s32(1)))
                     if a8 + 1 < registers.count { registers[a8 + 1] = .int(0) }
                 case 0x18:
-                    let raw = UInt64(UInt32(bitPattern: Int32(u(1)))) | (UInt64(UInt32(bitPattern: Int32(u(2)))) << 32)
+                    let raw = UInt64(u(1)) | (UInt64(u(2)) << 16) | (UInt64(u(3)) << 32) | (UInt64(u(4)) << 48)
                     registers[a8] = .long(Int64(bitPattern: raw))
                     if a8 + 1 < registers.count { registers[a8 + 1] = .int(0) }
                 case 0x19:
@@ -236,21 +256,28 @@ final class DalvikVM {
                 // ---- 移动 ----
                 case 0x01:
                     registers[a4] = registers[b4]
-                case 0x02, 0x03:
+                case 0x02:
                     let source = u(1)
                     if source < registers.count { registers[a8] = registers[source] }
                 case 0x04:
                     registers[a4] = registers[b4]
                     if a4 + 1 < registers.count { registers[a4 + 1] = .int(0) }
-                case 0x05, 0x06:
+                case 0x05:
                     let source = u(1)
                     if source < registers.count { registers[a8] = registers[source] }
                     if a8 + 1 < registers.count { registers[a8 + 1] = .int(0) }
                 case 0x07:
                     registers[a4] = registers[b4]
-                case 0x08, 0x09:
+                case 0x08:
                     let source = u(1)
                     if source < registers.count { registers[a8] = registers[source] }
+                case 0x03, 0x06, 0x09:
+                    let destination = u(1), source = u(2)
+                    guard destination < registers.count, source < registers.count else {
+                        throw DalvikError.format("move/16 寄存器越界")
+                    }
+                    registers[destination] = registers[source]
+                    if op == 0x06, destination + 1 < registers.count { registers[destination + 1] = .int(0) }
 
                 // ---- 返回 ----
                 case 0x0E:
@@ -306,7 +333,7 @@ final class DalvikVM {
                     if op == 0x24 {
                         let count = (w >> 12) & 0xF
                         let unit = u(2)
-                        let order = [unit & 0xF, (unit >> 4) & 0xF, (unit >> 8) & 0xF, (unit >> 12) & 0xF]
+                        let order = [unit & 0xF, (unit >> 4) & 0xF, (unit >> 8) & 0xF, (unit >> 12) & 0xF, a4]
                         for i in 0..<count where i < order.count {
                             let index = order[i]
                             values.append(index < registers.count ? registers[index] : .int(0))
@@ -349,9 +376,9 @@ final class DalvikVM {
                     let size = DalvikImage.u16(bytes, base + payload * 2 + 2)
                     let value = Int(registers[a8].intValue)
                     for i in 0..<size {
-                        let key = DalvikImage.s32(bytes, base + payload * 2 + 4 + i * 8)
+                        let key = DalvikImage.s32(bytes, base + payload * 2 + 4 + i * 4)
                         if key == value {
-                            next = pc + DalvikImage.s32(bytes, base + payload * 2 + 8 + i * 8)
+                            next = pc + DalvikImage.s32(bytes, base + payload * 2 + 4 + size * 4 + i * 4)
                             break
                         }
                     }
@@ -371,7 +398,7 @@ final class DalvikVM {
                 case 0x32...0x37:
                     let x = registers[a4]
                     let y = registers[b4]
-                    let eq = x.equalsValue(y)
+                    let eq = x.equalsRegister(y)
                     let lt = x.doubleValue < y.doubleValue
                     let gt = x.doubleValue > y.doubleValue
                     let ok: Bool
@@ -385,11 +412,12 @@ final class DalvikVM {
                     }
                     if ok { next = pc + s16(1) }
                 case 0x38...0x3D:
-                    let value = registers[a8].intValue
+                    let register = registers[a8]
+                    let value = register.intValue
                     let ok: Bool
                     switch op {
-                    case 0x38: ok = value == 0
-                    case 0x39: ok = value != 0
+                    case 0x38: ok = register.isZero
+                    case 0x39: ok = !register.isZero
                     case 0x3A: ok = value < 0
                     case 0x3B: ok = value >= 0
                     case 0x3C: ok = value > 0
@@ -433,7 +461,7 @@ final class DalvikVM {
                     }
 
                 // ---- 调用 ----
-                case 0x6E...0x78:
+                case 0x6E...0x72, 0x74...0x78:
                     let ref = image.methodRef(u(1))
                     var registerIndexes: [Int] = []
                     var count = 0
@@ -442,7 +470,7 @@ final class DalvikVM {
                         count = (w >> 12) & 0xF
                         let unit = u(2)
                         registerIndexes = [unit & 0xF, (unit >> 4) & 0xF,
-                                           (unit >> 8) & 0xF, (unit >> 12) & 0xF]
+                                           (unit >> 8) & 0xF, (unit >> 12) & 0xF, a4]
                         kind = ["virtual", "super", "direct", "static", "interface"][op - 0x6E]
                     } else {
                         count = a8
@@ -500,9 +528,12 @@ final class DalvikVM {
                 case 0xD0...0xD7:
                     let left = registers[b4]
                     let right = DalvikValue.int(Int32(s16(1)))
-                    registers[a4] = binary(op - 0xD0 + 0x90, left, right)
+                    registers[a4] = op == 0xD1 ? binary(0x91, right, left) : binary(op - 0xD0 + 0x90, left, right)
                 case 0xD8...0xE2:
-                    registers[a8] = binary(op - 0xD8 + 0x90, registers[a8], registers[b4])
+                    let packed = u(1)
+                    let left = registers[packed & 0xFF]
+                    let right = DalvikValue.int(Int32(Int8(bitPattern: UInt8(packed >> 8))))
+                    registers[a8] = op == 0xD9 ? binary(0x91, right, left) : binary(op - 0xD8 + 0x90, left, right)
 
                 default:
                     throw DalvikError.runtime(String(format: "未实现指令 0x%02X @%d in %@->%@",
@@ -523,6 +554,7 @@ final class DalvikVM {
             }
             pc = next
         }
+        guard pc == code.size else { throw DalvikError.format("跳转超出方法指令范围") }
         return nil
     }
 
@@ -585,28 +617,28 @@ final class DalvikVM {
             return .int(divisor == 0 ? 0 : (divisor == -1 ? (left.intValue == Int32.min ? Int32.min : 0 &- left.intValue) : left.intValue / divisor))
         case 0x94:
             let divisor = right.intValue
-            return .int(divisor == 0 ? 0 : left.intValue % divisor)
+            return .int(divisor == 0 || divisor == -1 ? 0 : left.intValue % divisor)
         case 0x95: return .int(left.intValue & right.intValue)
         case 0x96: return .int(left.intValue | right.intValue)
         case 0x97: return .int(left.intValue ^ right.intValue)
         case 0x98: return .int(left.intValue << (right.intValue & 31))
         case 0x99: return .int(left.intValue >> (right.intValue & 31))
-        case 0x9A: return .int(Int32(bitPattern: UInt32(bitPattern: left.intValue) >> (UInt32(right.intValue) & 31)))
+        case 0x9A: return .int(Int32(bitPattern: UInt32(bitPattern: left.intValue) >> (UInt32(bitPattern: right.intValue) & 31)))
         case 0x9B: return .long(left.longValue &+ right.longValue)
         case 0x9C: return .long(left.longValue &- right.longValue)
         case 0x9D: return .long(left.longValue &* right.longValue)
         case 0x9E:
             let divisor = right.longValue
-            return .long(divisor == 0 ? 0 : left.longValue / divisor)
+            return .long(divisor == 0 ? 0 : (divisor == -1 ? 0 &- left.longValue : left.longValue / divisor))
         case 0x9F:
             let divisor = right.longValue
-            return .long(divisor == 0 ? 0 : left.longValue % divisor)
+            return .long(divisor == 0 || divisor == -1 ? 0 : left.longValue % divisor)
         case 0xA0: return .long(left.longValue & right.longValue)
         case 0xA1: return .long(left.longValue | right.longValue)
         case 0xA2: return .long(left.longValue ^ right.longValue)
         case 0xA3: return .long(left.longValue << (right.longValue & 63))
         case 0xA4: return .long(left.longValue >> (right.longValue & 63))
-        case 0xA5: return .long(Int64(bitPattern: UInt64(bitPattern: left.longValue) >> (UInt64(right.longValue) & 63)))
+        case 0xA5: return .long(Int64(bitPattern: UInt64(bitPattern: left.longValue) >> (UInt64(bitPattern: right.longValue) & 63)))
         case 0xA6: return .float(Float(left.doubleValue + right.doubleValue))
         case 0xA7: return .float(Float(left.doubleValue - right.doubleValue))
         case 0xA8: return .float(Float(left.doubleValue * right.doubleValue))
@@ -623,22 +655,7 @@ final class DalvikVM {
 
     // MARK: - 指令长度
 
-    static let sizes: [Int] = {
-        var table = [Int](repeating: 1, count: 256)
-        for op in [0x02, 0x05, 0x08, 0x13, 0x15, 0x16, 0x19, 0x1A, 0x1C, 0x1F, 0x20,
-                   0x21, 0x22, 0x23, 0x29] + Array(0x2D...0x3D) + Array(0x44...0x6D)
-                   + Array(0x90...0xAF) + Array(0xD0...0xE2) {
-            table[op] = 2
-        }
-        for op in [0x03, 0x06, 0x09, 0x14, 0x17, 0x1B, 0x24, 0x25, 0x26, 0x2A, 0x2B, 0x2C]
-                   + Array(0x6E...0x78) {
-            table[op] = 3
-        }
-        table[0x18] = 5
-        table[0xFA] = 4
-        table[0xFB] = 4
-        return table
-    }()
+    static let sizes = DexInstruction.sizes
 
     static var traceHandler: ((String) -> Void)?
     private static func trace(_ text: String) {

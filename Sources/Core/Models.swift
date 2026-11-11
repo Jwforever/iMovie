@@ -22,7 +22,7 @@ public enum SourceRuntime: String, Codable {
 
     public var explanation: String {
         switch self {
-        case .plugin: return "在设备内静态解开配置指定的 spider 插件，取出站点域名与选择器后直接采集网页，不执行安卓代码。"
+        case .plugin: return "在设备内解开配置指定的 spider 插件，优先解释执行采集器，失败时使用插件中提取的网页规则。"
         case .jsonAPI: return "直接读取配置里的 JSON 采集接口。"
         case .javascript: return "这个来源是 drpy 等脚本源，当前版本没有脚本运行时。"
         case .unsupported: return "配置条目里没有可识别为采集器或接口的地址。"

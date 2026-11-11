@@ -22,9 +22,13 @@ public actor GuardRuleCatalog {
 
     private var cachedSource: String?
     private var cachedIndex: GuardIndex?
-    private var inFlight: Task<GuardIndex, Error>?
+    private struct Pending { let id: UUID; let task: Task<GuardIndex, Error> }
+    private var inFlight: [String: Pending] = [:]
+    private let loadDex: @Sendable (String?) async throws -> Data
 
-    public init() {}
+    public init() { loadDex = { try await SpiderPluginCache.shared.dex(spider: $0) } }
+
+    init(loadDex: @escaping @Sendable (String?) async throws -> Data) { self.loadDex = loadDex }
 
     /// 从配置的 spider 字段里取出插件地址（去掉 ;md5; 校验段）。
     static func jarURL(from spider: String?) -> String? {
@@ -43,22 +47,45 @@ public actor GuardRuleCatalog {
 
     public func loadedProfileCount() -> Int { cachedIndex?.profiles.count ?? 0 }
 
-    func index(spider: String?) async throws -> GuardIndex {
-        guard let address = Self.jarURL(from: spider) else {
-            throw ViewerError.message("配置里没有可用的插件地址（spider），无法在本机解析来源规则。")
-        }
-        if cachedSource == address, let cachedIndex { return cachedIndex }
-        if let inFlight { return try await inFlight.value }
+    public func refresh(spider: String?) async {
+        cachedSource = nil
+        cachedIndex = nil
+        inFlight.values.forEach { $0.task.cancel() }
+        inFlight.removeAll()
+        await SpiderPluginCache.shared.invalidate(spider: spider)
+    }
 
-        let task = Task<GuardIndex, Error> { [address] in
-            try await Self.build(address: address)
+    func index(spider: String?) async throws -> GuardIndex {
+        try Task.checkCancellation()
+        let identity = try SpiderPluginCache.identity(spider)
+        if cachedSource == identity.key, let cachedIndex { return cachedIndex }
+        if let request = inFlight[identity.key] {
+            let result = try await request.task.value
+            try Task.checkCancellation()
+            return result
         }
-        inFlight = task
-        defer { inFlight = nil }
-        let result = try await task.value
-        cachedSource = address
-        cachedIndex = result
-        return result
+
+        let id = UUID(), loader = loadDex
+        let task = Task.detached(priority: .utility) {
+            let dex = try await loader(spider)
+            try Task.checkCancellation()
+            let result = Self.decode(file: try DexFile(data: dex), source: identity.url.absoluteString)
+            try Task.checkCancellation()
+            return result
+        }
+        inFlight[identity.key] = Pending(id: id, task: task)
+        do {
+            let result = try await task.value
+            guard inFlight[identity.key]?.id == id else { throw CancellationError() }
+            inFlight[identity.key] = nil
+            cachedSource = identity.key
+            cachedIndex = result
+            try Task.checkCancellation()
+            return result
+        } catch {
+            if inFlight[identity.key]?.id == id { inFlight[identity.key] = nil }
+            throw error
+        }
     }
 
     /// 取某个来源的规则；`ext` / 配置自带 ios 规则由调用方优先处理。
@@ -90,32 +117,6 @@ public actor GuardRuleCatalog {
     }
 
     // MARK: - 构建
-
-    private static func build(address: String) async throws -> GuardIndex {
-        let url = try HTTPAddress.parse(address)
-        let dex = try await loadDex(url: url)
-        let file = try DexFile(data: dex)
-        return decode(file: file, source: address)
-    }
-
-    private static func loadDex(url: URL) async throws -> Data {
-        let cached = cacheFile(for: url)
-        if let data = try? Data(contentsOf: cached), GuardContainer.isDex([UInt8](data.prefix(4))) {
-            return data
-        }
-        let (archive, _) = try await HTTPClient().data(from: url, headers: ["Accept": "*/*"])
-        let dex = try GuardContainer.innerDex(from: archive)
-        try? FileManager.default.createDirectory(at: cached.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? dex.write(to: cached, options: .atomic)
-        return dex
-    }
-
-    private static func cacheFile(for url: URL) -> URL {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        let name = url.lastPathComponent.isEmpty ? "spider.jar" : url.lastPathComponent
-        return base.appendingPathComponent("GuardPlugins", isDirectory: true).appendingPathComponent(name + ".dex")
-    }
 
     static func decode(file: DexFile, source: String) -> GuardIndex {
         let decoder = GuardStringDecoder(dex: file)

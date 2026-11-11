@@ -246,7 +246,7 @@ extension DalvikNatives {
         vm.register("Lokhttp3/OkHttpClient;", "<init>") { _, _, _ in .ref(nil) }
         vm.register("Lokhttp3/OkHttpClient;", "newCall") { _, _, args in
             let call = DalvikObject(className: "Lokhttp3/Call;")
-            call.payload = args.first?.asObject
+            call.payload = args.first?.asObject?.payload
             return .ref(call)
         }
         for name in ["connectTimeout", "readTimeout", "writeTimeout", "followRedirects",
@@ -304,7 +304,7 @@ extension DalvikNatives {
         }
         vm.register("Lokhttp3/Call;", "execute") { vm, this, _ in
             let request = this?.payload as? RequestBox
-            let result = perform(vm, request)
+            let result = try perform(vm, request)
             let response = DalvikObject(className: "Lokhttp3/Response;")
             response.payload = result
             return .ref(response)
@@ -386,12 +386,13 @@ extension DalvikNatives {
     }
 
     /// 同步 HTTP。插件代码本身就是同步调用，这里用信号量等结果。
-    static func perform(_ vm: DalvikVM, _ request: RequestBox?) -> HTTPResult {
+    static func perform(_ vm: DalvikVM, _ request: RequestBox?) throws -> HTTPResult {
+        try vm.checkExecution()
         guard let request, let url = URL(string: request.url) else {
             vm.log("(无效地址)", 0)
             return HTTPResult(code: 0, body: Data(), headers: [:])
         }
-        var mutable = URLRequest(url: url)
+        var mutable = URLRequest(url: url, timeoutInterval: 25)
         mutable.httpMethod = request.method
         for (key, value) in request.headers { mutable.setValue(value, forHTTPHeaderField: key) }
         if let body = request.body { mutable.httpBody = body }
@@ -400,26 +401,40 @@ extension DalvikNatives {
         }
 
         final class Box {
-            var value = HTTPResult(code: 0, body: Data(), headers: [:])
+            private let lock = NSLock()
+            private var result: Result<HTTPResult, Error>?
+            func store(_ value: Result<HTTPResult, Error>) {
+                lock.lock(); defer { lock.unlock() }
+                result = value
+            }
+            func get() throws -> HTTPResult {
+                lock.lock(); defer { lock.unlock() }
+                guard let result else { throw URLError(.timedOut) }
+                return try result.get()
+            }
         }
         let box = Box()
         let semaphore = DispatchSemaphore(value: 0)
-        let task = URLSession.shared.dataTask(with: mutable) { data, response, _ in
-            if let http = response as? HTTPURLResponse {
+        let task = vm.httpSession.dataTask(with: mutable) { data, response, error in
+            if let error { box.store(.failure(error)) }
+            else if let http = response as? HTTPURLResponse {
                 var headers: [String: String] = [:]
                 for (key, value) in http.allHeaderFields {
                     headers[String(describing: key)] = String(describing: value)
                 }
-                box.value = HTTPResult(code: http.statusCode, body: data ?? Data(), headers: headers)
+                box.store(.success(HTTPResult(code: http.statusCode, body: data ?? Data(), headers: headers)))
             } else {
-                box.value = HTTPResult(code: 0, body: data ?? Data(), headers: [:])
+                box.store(.failure(URLError(.badServerResponse)))
             }
             semaphore.signal()
         }
         task.resume()
-        _ = semaphore.wait(timeout: .now() + 25)
-        vm.log(request.url, box.value.code)
-        return box.value
+        defer { task.cancel() }
+        while semaphore.wait(timeout: .now() + 0.05) == .timedOut { try vm.checkExecution() }
+        try vm.checkExecution()
+        let result = try box.get()
+        vm.log(request.url, result.code)
+        return result
     }
 
     final class RequestBox {

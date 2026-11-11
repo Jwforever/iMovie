@@ -287,9 +287,10 @@ final class DalvikImage {
         let ins = DalvikImage.u16(bytes, offset + 2)
         let tries = DalvikImage.u16(bytes, offset + 6)
         let size = DalvikImage.u32(bytes, offset + 12)
+        guard size <= (bytes.count - offset - 16) / 2 else { return nil }
         return DalvikCode(registers: registers, ins: ins, size: size,
                           base: offset + 16, tries: tries,
-                          triesOffset: offset + 16 + size * 4)
+                          triesOffset: offset + 16 + size * 2 + (tries > 0 && size % 2 != 0 ? 2 : 0))
     }
 
     /// 命中的 try 区块，返回 [(捕获类型或 nil, handler 地址)]。
@@ -303,7 +304,7 @@ final class DalvikImage {
             let handler = DalvikImage.u16(bytes, base + 6)
             guard pc >= start, pc < start + count else { continue }
             var out: [(String?, Int)] = []
-            var p = handlersOffset + handler * 2
+            var p = handlersOffset + handler
             let size = sleb(p).value
             p = sleb(p).next
             for _ in 0..<abs(size) {
