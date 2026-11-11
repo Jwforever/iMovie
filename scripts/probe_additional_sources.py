@@ -3,6 +3,7 @@ import concurrent.futures
 import json
 import urllib.error
 import urllib.request
+import urllib.parse
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
@@ -10,8 +11,11 @@ from pathlib import Path
 addresses = [
     "https://www.libvio.pw/", "https://libvio.app/", "https://www.libvio.link/",
     "https://www.4kcz.com/", "https://czzy.top/", "https://www.cz4k.com/",
-    "https://auete.site/", "https://auete.com/", "https://auete.pro/",
-    "https://www.bttwo.com/", "https://jpys.me/", "https://dm84.tv/",
+    "https://www.libvio.to/", "https://www.libvio.io/",
+    "https://www.aeete.com/", "https://www.aeete.com/Movie/index.html",
+    "https://www.aeete.com/auete2so.php?searchword=" + urllib.parse.quote("唐") + "&page=1",
+    "https://www.aeete.com/Tv/neidi/zheyueliang/",
+    "https://auete.asia/", "https://dm84.tv/",
 ]
 
 
@@ -44,7 +48,8 @@ def probe(address):
             from urllib.parse import urlparse
             page_dir = Path("dist/source-pages")
             page_dir.mkdir(parents=True, exist_ok=True)
-            (page_dir / (urlparse(address).netloc + ".html")).write_bytes(data)
+            file_name = urlparse(address).netloc + ("-" + urlparse(address).path.strip("/").replace("/", "_") if urlparse(address).path.strip("/") else "")
+            (page_dir / (file_name + ".html")).write_bytes(data)
             parser = Links()
             parser.feed(data.decode("utf-8", errors="replace"))
             links = [entry for entry in parser.links if entry["href"].startswith(("https://", "//", "/detail/", "/play/", "/movie/", "/movie_bt", "/type/", "/search"))]

@@ -26,6 +26,20 @@ final class AppStore: ObservableObject {
     @Published private(set) var resolvingPlayback = false
     @Published var error: String?
     @Published var playback: PlaybackRequest?
+    @Published private(set) var homeSourceKey: String
+
+    var homeSource: SourceSite? {
+        guard let config else { return nil }
+        return config.sites.first { $0.key == homeSourceKey }
+            ?? config.nativeSites.first { $0.nativeAdapter == .dm84 }
+            ?? config.nativeSites.first
+            ?? config.sites.first
+    }
+
+    func selectHomeSource(_ site: SourceSite) {
+        homeSourceKey = site.key
+        defaults.set(site.key, forKey: "homeSourceKey")
+    }
 
     init(defaults: UserDefaults = .standard) {
         let storage: UserDefaults
@@ -40,6 +54,7 @@ final class AppStore: ObservableObject {
         #endif
         self.defaults = storage
         configURL = initialConfigURL
+        homeSourceKey = storage.string(forKey: "homeSourceKey") ?? ""
         config = Self.load(SourceConfig.self, key: "config", defaults: storage)
         favorites = Self.load([MediaLink].self, key: "favorites", defaults: storage) ?? []
         history = Self.load([WatchRecord].self, key: "history", defaults: storage) ?? []

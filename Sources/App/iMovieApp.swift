@@ -16,9 +16,13 @@ struct iMovieApp: App {
 }
 
 enum Theme {
-    static let accent = Color(red: 0.50, green: 0.85, blue: 0.66)
-    static let backdrop = Color(red: 0.04, green: 0.06, blue: 0.07)
-    static let panel = Color(red: 0.08, green: 0.11, blue: 0.12)
+    static let accent = Color(red: 0.39, green: 0.87, blue: 0.67)
+    static let backdrop = Color(red: 0.035, green: 0.045, blue: 0.065)
+    static let panel = Color(red: 0.075, green: 0.09, blue: 0.12)
+
+    static func sourceName(_ name: String) -> String {
+        name.components(separatedBy: "┃").first?.trimmingCharacters(in: .whitespaces) ?? name
+    }
 }
 
 @MainActor struct RootView: View {
@@ -27,7 +31,7 @@ enum Theme {
     var body: some View {
         TabView {
             NavigationStack { LibraryView() }
-                .tabItem { Label("片库", systemImage: "play.rectangle") }
+                .tabItem { Label("首页", systemImage: "house.fill") }
             NavigationStack { SearchView() }
                 .tabItem { Label("搜索", systemImage: "magnifyingglass") }
             NavigationStack { LiveView() }

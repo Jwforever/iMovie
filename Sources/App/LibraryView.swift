@@ -2,73 +2,132 @@ import SwiftUI
 
 @MainActor struct LibraryView: View {
     @EnvironmentObject private var store: AppStore
+    @State private var choosingSource = false
+    @State private var openingLink = false
+
+    var body: some View {
+        Group {
+            if let site = store.homeSource {
+                SiteView(site: site, embedded: true).id(site.id)
+            } else {
+                VStack(spacing: 22) {
+                    Image(systemName: "play.rectangle.on.rectangle.fill")
+                        .font(.system(size: 64, weight: .light)).foregroundStyle(Theme.accent)
+                    Text("把喜欢的故事，放上首页").font(.title2.bold())
+                    Text("导入你的接口，选择点播来源。\n分类、推荐和最近播放会出现在这里。")
+                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    NavigationLink { SettingsView() } label: {
+                        Label("导入接口配置", systemImage: "plus.circle.fill").padding(.vertical, 6)
+                    }.buttonStyle(.borderedProminent)
+                    Button("打开播放地址") { openingLink = true }.foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(24)
+            }
+        }
+        .background(Theme.backdrop)
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { choosingSource = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.rectangle.fill").foregroundStyle(Theme.accent)
+                        Text(store.homeSource.map { Theme.sourceName($0.name) } ?? "iMovie")
+                            .font(.headline).foregroundStyle(.primary)
+                        Image(systemName: "chevron.down").font(.caption2.bold()).foregroundStyle(.secondary)
+                    }
+                }.accessibilityLabel("切换点播源").accessibilityIdentifier("home-source-picker")
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { openingLink = true } label: { Image(systemName: "link") }
+                    .accessibilityLabel("打开播放地址").accessibilityIdentifier("home-open-link")
+            }
+        }
+        .sheet(isPresented: $choosingSource) { SourcePickerView().environmentObject(store) }
+        .sheet(isPresented: $openingLink) { DirectLinkView().environmentObject(store) }
+    }
+}
+
+@MainActor struct SourcePickerView: View {
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var filter = ""
+
+    private var sites: [SourceSite] {
+        (store.config?.sites ?? []).filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("可在本机打开") {
+                    ForEach(sites.filter(\.isNative)) { sourceRow($0) }
+                    if sites.filter(\.isNative).isEmpty { Text("尚未找到已适配来源").foregroundStyle(.secondary) }
+                }
+                if sites.contains(where: { !$0.isNative }) {
+                    Section("其他来源") { ForEach(sites.filter { !$0.isNative }) { sourceRow($0) } }
+                }
+            }
+            .scrollContentBackground(.hidden).background(Theme.backdrop)
+            .searchable(text: $filter, prompt: "查找点播来源")
+            .navigationTitle("选择点播源").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
+        }
+    }
+
+    private func sourceRow(_ site: SourceSite) -> some View {
+        Button {
+            store.selectHomeSource(site)
+            dismiss()
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(site.name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+                    Text(site.isNative ? (site.searchable ? "分类 · 搜索 · 选集" : "分类 · 选集") : site.runtime.title)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if store.homeSource?.id == site.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent) }
+                else if !site.isNative { Image(systemName: "wrench.and.screwdriver").foregroundStyle(.secondary) }
+            }.padding(.vertical, 5)
+        }.accessibilityIdentifier("source-\(site.key)")
+    }
+}
+
+@MainActor struct DirectLinkView: View {
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
     @State private var directURL = ""
     @State private var openAsWebPage = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 9) {
-                    Text("YOUR LITTLE CINEMA").font(.caption2.monospaced()).tracking(3).foregroundStyle(Theme.accent)
-                    Text("留一点时间，\n给喜欢的故事。")
-                        .font(.system(size: 32, weight: .semibold, design: .rounded)).lineSpacing(5)
-                    Text("iMovie · 私人播放器").font(.subheadline).foregroundStyle(.secondary)
-                }.padding(.top, 10)
-
-                VStack(alignment: .leading, spacing: 13) {
-                    Label("打开播放地址", systemImage: "link").font(.headline)
+        NavigationStack {
+            Form {
+                Section("视频或网页地址") {
                     TextField("https://… / 视频或 HLS 地址", text: $directURL)
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                         .accessibilityIdentifier("library-direct-url")
-                        .padding(13).background(Theme.backdrop, in: RoundedRectangle(cornerRadius: 12))
                         .onSubmit { playDirect() }
                     Toggle("使用内置网页播放器", isOn: $openAsWebPage)
                         .font(.subheadline).accessibilityIdentifier("library-web-mode")
                     Button(action: playDirect) {
-                        Label("开始播放", systemImage: "play.fill").frame(maxWidth: .infinity).padding(.vertical, 7)
+                        Label("开始播放", systemImage: "play.fill").frame(maxWidth: .infinity)
                     }.buttonStyle(.borderedProminent).accessibilityIdentifier("library-open")
                         .disabled(directURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }.padding(18).background(Theme.panel, in: RoundedRectangle(cornerRadius: 22))
-
-                if let config = store.config {
-                    if config.nativeSites.isEmpty {
-                        EmptyPanel(icon: "shippingbox", title: "配置已导入，点播源需要适配", message: "共 \(config.sites.count) 个点播源，目前没有可在本机执行的来源。可在下方查看各源的兼容情况，或进入直播尝试 HTTP 频道。")
-                    }
-                    HStack {
-                        Text("我的来源").font(.title3.bold())
-                        Spacer()
-                        Text("\(config.sites.count) 个").font(.caption).foregroundStyle(.secondary)
-                    }
-                    LazyVStack(spacing: 10) {
-                        ForEach(config.sites.sorted { $0.isNative && !$1.isNative }) { site in
-                            NavigationLink { SiteView(site: site) } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: site.isNative ? "rectangle.stack" : "puzzlepiece.extension")
-                                        .foregroundStyle(site.isNative ? Theme.accent : Color.secondary)
-                                    Text(site.name).font(.subheadline.weight(.medium)).foregroundStyle(.primary).lineLimit(2)
-                                    Spacer(minLength: 3)
-                                    RuntimeLabel(runtime: site.runtime)
-                                    Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
-                                }.padding(15).background(Theme.panel, in: RoundedRectangle(cornerRadius: 16))
-                            }.buttonStyle(.plain).accessibilityIdentifier("source-\(site.key)")
-                        }
-                    }
-                } else {
-                    EmptyPanel(icon: "rectangle.stack.badge.plus", title: "从你的配置开始", message: "在设置中导入 TVBox 配置，查看来源兼容性；也可以直接粘贴视频地址播放。")
-                    NavigationLink { SettingsView() } label: {
-                        Label("导入接口配置", systemImage: "plus.circle").frame(maxWidth: .infinity)
-                    }.buttonStyle(.bordered)
                 }
-            }.padding(20)
+            }.scrollContentBackground(.hidden).background(Theme.backdrop)
+                .navigationTitle("打开播放地址").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
         }
-        .background(Theme.backdrop)
-        .navigationTitle("iMovie").navigationBarTitleDisplayMode(.inline)
     }
 
     private func playDirect() {
         do {
             let url = try HTTPAddress.parse(directURL)
-            store.play(MediaLink(title: url.lastPathComponent.isEmpty ? "地址播放" : url.lastPathComponent, url: url.absoluteString, group: openAsWebPage ? "网页" : "直链", kind: openAsWebPage ? .web : .direct))
+            let media = MediaLink(title: url.lastPathComponent.isEmpty ? "地址播放" : url.lastPathComponent, url: url.absoluteString, group: openAsWebPage ? "网页" : "直链", kind: openAsWebPage ? .web : .direct)
+            dismiss()
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                store.play(media)
+            }
         } catch { store.error = error.localizedDescription }
     }
 }
@@ -76,6 +135,7 @@ import SwiftUI
 @MainActor struct SiteView: View {
     @EnvironmentObject private var store: AppStore
     let site: SourceSite
+    var embedded = false
     @State private var videos: [Video] = []
     @State private var categories: [VideoCategory] = []
     @State private var search = ""
@@ -87,6 +147,7 @@ import SwiftUI
     @State private var error: String?
     @State private var requestToken = UUID()
     private let client = TVAPIClient()
+    private var isHome: Bool { category.isEmpty && activeSearch.isEmpty }
 
     var body: some View {
         Group {
@@ -102,23 +163,21 @@ import SwiftUI
                 }
             } else {
                 ScrollView {
-                    VStack(spacing: 18) {
-                        HStack {
-                            TextField("搜索这个来源", text: $search).submitLabel(.search)
-                                .onSubmit { submitSearch() }
-                                .accessibilityIdentifier("site-search-query")
-                            Button(action: submitSearch) { Image(systemName: "magnifyingglass") }
-                                .accessibilityLabel("搜索")
-                                .accessibilityIdentifier("site-search-submit")
-                        }.padding(13).background(Theme.panel, in: RoundedRectangle(cornerRadius: 14))
-                        if !categories.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack {
-                                    categoryButton("全部", id: "")
-                                    ForEach(categories) { item in categoryButton(item.name, id: item.id) }
-                                }
-                            }
+                    LazyVStack(alignment: .leading, spacing: 22, pinnedViews: [.sectionHeaders]) {
+                      Section {
+                        if isHome { recentSection }
+                        if isHome, let featured = videos.first, error == nil {
+                            NavigationLink { VideoDetailView(site: site, video: featured) } label: {
+                                FeaturedVideoCard(video: featured, source: Theme.sourceName(site.name))
+                            }.buttonStyle(.plain)
                         }
+                        HStack {
+                            Text(activeSearch.isEmpty ? (isHome ? "热播推荐" : (categories.first { $0.id == category }?.name ?? "全部内容")) : "搜索结果")
+                                .font(.title3.bold())
+                            Spacer()
+                            Text(isHome ? "来源首页" : "\(videos.count) 部").font(.caption).foregroundStyle(.secondary)
+                        }
+                        .accessibilityIdentifier("home-content-heading")
                         if let error {
                             EmptyPanel(icon: "wifi.exclamationmark", title: "加载失败", message: error)
                             Button("重试") { Task { await load(reset: true) } }.buttonStyle(.bordered)
@@ -126,39 +185,89 @@ import SwiftUI
                         if !loading && error == nil && videos.isEmpty {
                             EmptyPanel(icon: "magnifyingglass", title: "暂无内容", message: "试试切换分类或更换关键词。")
                         }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 135), spacing: 14)], spacing: 22) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 20) {
                             ForEach(videos) { video in
-                                NavigationLink { VideoDetailView(site: site, video: video) } label: {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        PosterView(url: video.poster)
-                                        Text(video.title).font(.subheadline.weight(.medium)).foregroundStyle(.primary).lineLimit(2)
-                                        Text(video.note).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                    }
-                                }.buttonStyle(.plain)
+                                NavigationLink { VideoDetailView(site: site, video: video) } label: { VideoPosterCard(video: video) }
+                                    .buttonStyle(.plain)
                             }
                         }
-                        if loading { ProgressView().padding() }
+                        if loading { ProgressView().frame(maxWidth: .infinity).padding(25) }
                         if !loading && page < pageCount {
-                            Button("加载更多") { Task { await load(reset: false) } }.buttonStyle(.bordered)
+                            Button("加载更多") { Task { await load(reset: false) } }
+                                .buttonStyle(.bordered).frame(maxWidth: .infinity)
                         }
-                    }.padding(20)
+                      } header: {
+                       VStack(spacing: 14) {
+                        HStack {
+                            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                            TextField("在\(Theme.sourceName(site.name))搜索", text: $search).submitLabel(.search)
+                                .onSubmit { submitSearch() }
+                                .accessibilityIdentifier("site-search-query")
+                            if !search.isEmpty { Button { search = ""; submitSearch() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) } }
+                            Button("搜索", action: submitSearch).font(.subheadline.weight(.medium))
+                                .accessibilityLabel("搜索")
+                                .accessibilityIdentifier("site-search-submit")
+                        }.padding(.horizontal, 14).padding(.vertical, 12).background(Theme.panel, in: RoundedRectangle(cornerRadius: 14))
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 22) {
+                                    categoryButton("推荐", id: "")
+                                    ForEach(categories) { item in categoryButton(item.name, id: item.id) }
+                                }
+                            }
+                       }.padding(.top, 10).padding(.bottom, 8).background(Theme.backdrop)
+                      }
+                    }.padding(.horizontal, 18).padding(.bottom, 24)
                 }
+                .refreshable { await load(reset: true) }
             }
         }
         .background(Theme.backdrop)
-        .navigationTitle(site.name).navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(embedded ? "" : Theme.sourceName(site.name)).navigationBarTitleDisplayMode(.inline)
         .task { if site.isNative && videos.isEmpty { await load(reset: true) } }
     }
 
     private func categoryButton(_ title: String, id: String) -> some View {
-        Button(title) {
+        Button {
             category = id
             activeSearch = ""
             search = ""
             Task { await load(reset: true) }
+        } label: {
+            VStack(spacing: 8) {
+                Text(title).font(.system(size: 16, weight: category == id ? .bold : .medium))
+                    .foregroundStyle(category == id ? Color.primary : Color.secondary)
+                Capsule().fill(category == id ? Theme.accent : Color.clear).frame(height: 3)
+            }.fixedSize(horizontal: true, vertical: false)
+        }.buttonStyle(.plain).accessibilityIdentifier("category-\(id.isEmpty ? "home" : id)")
+    }
+
+    @ViewBuilder private var recentSection: some View {
+        if !store.history.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("最近播放").font(.title3.bold())
+                    Spacer()
+                    NavigationLink { CollectionView() } label: { Text("全部记录").font(.caption).foregroundStyle(.secondary) }
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Array(store.history.prefix(10))) { record in
+                            Button { store.play(record.media) } label: {
+                                HStack(spacing: 11) {
+                                    Image(systemName: "play.fill").font(.title3).foregroundStyle(Theme.accent)
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(record.media.title).font(.subheadline.weight(.semibold)).lineLimit(1).foregroundStyle(.primary)
+                                        Text(record.position > 0 ? "看到 \(Int(record.position) / 60):\(String(format: "%02d", Int(record.position) % 60)) · 继续播放" : "继续播放")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }.frame(width: 230, alignment: .leading).padding(15)
+                                    .background(Theme.panel, in: RoundedRectangle(cornerRadius: 16))
+                            }.buttonStyle(.plain).accessibilityIdentifier("recent-\(record.id)")
+                        }
+                    }
+                }
+            }.accessibilityIdentifier("home-recent")
         }
-        .buttonStyle(.bordered)
-        .tint(category == id ? Theme.accent : .gray)
     }
 
     private func submitSearch() {
@@ -172,6 +281,7 @@ import SwiftUI
         requestToken = token
         loading = true
         error = nil
+        if reset { videos = []; pageCount = 1 }
         let requestedPage = reset ? 1 : page + 1
         defer { if requestToken == token { loading = false } }
         do {
@@ -187,6 +297,57 @@ import SwiftUI
             pageCount = result.pageCount
         } catch is CancellationError { }
         catch { if requestToken == token { self.error = error.localizedDescription } }
+    }
+}
+
+@MainActor struct FeaturedVideoCard: View {
+    let video: Video
+    let source: String
+
+    var body: some View {
+        Color.clear.frame(height: 215)
+            .background(Theme.panel)
+            .overlay(alignment: .trailing) {
+                AsyncImage(url: HTTPAddress.optional(video.poster)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: { Image(systemName: "film.stack").font(.system(size: 90)).foregroundStyle(Theme.accent.opacity(0.15)) }
+                    .frame(width: 185, height: 250).clipped()
+            }
+            .overlay {
+                LinearGradient(colors: [Theme.panel, Theme.panel.opacity(0.88), Theme.panel.opacity(0.05)], startPoint: .leading, endPoint: .trailing)
+            }
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 11) {
+                    Text("今日推荐").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
+                    Text(video.title).font(.system(size: 25, weight: .bold)).foregroundStyle(.white).lineLimit(2)
+                        .frame(maxWidth: 230, alignment: .leading)
+                    Text(video.note.isEmpty ? source : video.note).font(.caption).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
+                    Label("立即观看", systemImage: "play.fill").font(.caption.bold()).foregroundStyle(Theme.backdrop)
+                        .padding(.horizontal, 13).padding(.vertical, 9).background(Theme.accent, in: Capsule())
+                }.padding(21)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .accessibilityElement(children: .ignore).accessibilityLabel("今日推荐：\(video.title)")
+            .accessibilityIdentifier("home-featured")
+    }
+}
+
+@MainActor struct VideoPosterCard: View {
+    let video: Video
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PosterView(url: video.poster)
+                .overlay(alignment: .bottomTrailing) {
+                    if !video.note.isEmpty {
+                        Text(video.note).font(.system(size: 10, weight: .medium)).lineLimit(1).foregroundStyle(.white)
+                            .padding(.horizontal, 6).padding(.vertical, 4)
+                            .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 5)).padding(6)
+                    }
+                }
+            Text(video.title).font(.system(size: 13, weight: .medium)).foregroundStyle(.primary).lineLimit(2)
+                .frame(height: 34, alignment: .topLeading)
+        }.accessibilityElement(children: .combine)
     }
 }
 
