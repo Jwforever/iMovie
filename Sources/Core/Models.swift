@@ -57,7 +57,7 @@ public struct SourceSite: Codable, Identifiable, Hashable {
 }
 
 public enum NativeSourceAdapter: String, Codable {
-    case tuxiaobei, dm84, bilibili, libvio, auete
+    case tuxiaobei, dm84, bilibili, libvio, auete, firstAid
 
     static func identify(type: Int, api: String, extensionValue: String?) -> NativeSourceAdapter? {
         if type == 3 {
@@ -66,6 +66,7 @@ public enum NativeSourceAdapter: String, Codable {
             case "csp_BiliGuard", "csp_Bili": return .bilibili
             case "csp_LibvioGuard", "csp_Libvio": return .libvio
             case "csp_AueteGuard", "csp_Auete": return .auete
+            case "csp_FirstAidGuard", "csp_FirstAid": return .firstAid
             default: break
             }
         }

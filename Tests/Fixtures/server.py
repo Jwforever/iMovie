@@ -5,12 +5,15 @@ import argparse
 import base64
 import json
 import re
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 
 def handler(media: bytes):
+    image_requests = {}
+    image_lock = threading.Lock()
     class FixtureHandler(BaseHTTPRequestHandler):
         def do_HEAD(self):
             self.do_GET()
@@ -37,8 +40,9 @@ def handler(media: bytes):
                 body = media[start:end + 1]
                 content_type = "video/mp4"
             elif parsed.path == "/tv":
-                config = {"sites": [{"key": "fixture", "name": "演示片库", "type": 1, "api": origin + "/api"},
-                                    {"key": "fixture-two", "name": "第二来源", "type": 1, "api": origin + "/api-two"}],
+                suffix = "?image=" + query["image"][0] if query.get("image") else ""
+                config = {"sites": [{"key": "fixture", "name": "演示片库", "type": 1, "api": origin + "/api" + suffix},
+                                    {"key": "fixture-two", "name": "第二来源", "type": 1, "api": origin + "/api-two" + suffix}],
                           "lives": [{"name": "演示直播", "url": origin + "/live.m3u"}]}
                 body = b"\xff\xd8\xffimovie**" + base64.b64encode(json.dumps(config, ensure_ascii=False).encode("utf-8"))
                 content_type = "application/octet-stream"
@@ -47,6 +51,8 @@ def handler(media: bytes):
                 video = {"vod_id": "1", "vod_name": "第二来源样片" if parsed.path == "/api-two" else "播放验证样片", "vod_pic": "", "vod_remarks": "本地生成 · 测试视频",
                          "vod_content": "这是自动化测试生成的色彩动画，用于验证选集、播放器、收藏和记录。",
                          "vod_play_from": "本机播放", "vod_play_url": "第 1 集$" + origin + "/sample.mp4#第 2 集$" + origin + "/sample.mp4?episode=2"}
+                if query.get("image"):
+                    video["vod_pic"] = origin + "/poster.png?key=" + query["image"][0]
                 videos = [video]
                 if query.get("wd") == ["样片"]:
                     videos = [{**video, "vod_id": "weak", "vod_name": "无关花絮"}, video,
@@ -74,6 +80,20 @@ def handler(media: bytes):
                     {"id": "10003", "title": "样片", "cover": {}, "rating": {"value": 8.2, "count": 3500}, "card_subtitle": "测试榜单 · 仅用于回归"}]}
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                 content_type = "application/json; charset=utf-8"
+                self.send_response(200)
+            elif parsed.path == "/poster.png":
+                key = query.get("key", ["default"])[0]
+                with image_lock:
+                    image_requests[key] = image_requests.get(key, 0) + 1
+                body = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+                content_type = "image/png"
+                self.send_response(200)
+                self.send_header("Cache-Control", "no-store")
+            elif parsed.path == "/image-stats":
+                with image_lock:
+                    count = image_requests.get(query.get("key", ["default"])[0], 0)
+                body = json.dumps({"requests": count}).encode()
+                content_type = "application/json"
                 self.send_response(200)
             else:
                 self.send_error(404)

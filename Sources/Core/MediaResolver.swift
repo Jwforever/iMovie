@@ -32,6 +32,11 @@ public struct MediaResolver {
                     var payload: [String: Any] = ["url": value, "t": stamp, "key": key, "client_fallback": false]
                     if let act = bootstrap["act"] { payload["act"] = act }
                     headers["Referer"] = final.absoluteString
+                    var origin = URLComponents()
+                    origin.scheme = final.scheme
+                    origin.host = final.host
+                    origin.port = final.port
+                    headers["Origin"] = origin.url?.absoluteString
                     let endpoint = URL(string: "/api/parse", relativeTo: final)!.absoluteURL
                     let response = try await http.post(to: endpoint, json: payload, headers: headers)
                     if let root = try JSONSerialization.jsonObject(with: response) as? [String: Any],

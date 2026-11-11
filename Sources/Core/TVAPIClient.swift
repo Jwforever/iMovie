@@ -23,6 +23,7 @@ public struct TVAPIClient {
     }
 
     private func loadPage(site: SourceSite, category: String?, search: String?, page: Int) async throws -> VideoPage {
+        if site.nativeAdapter == .firstAid { return try await FirstAidAdapter().page(category: category, search: search, page: page) }
         if site.nativeAdapter == .auete { return try await AueteAdapter().page(category: category, search: search, page: page) }
         if site.nativeAdapter == .tuxiaobei {
             return try await TuxiaobeiAdapter().page(category: category, search: search, page: page)
@@ -38,6 +39,7 @@ public struct TVAPIClient {
     }
 
     public func detail(site: SourceSite, id: String) async throws -> Video {
+        if site.nativeAdapter == .firstAid { return try await FirstAidAdapter().detail(id: id) }
         if site.nativeAdapter == .auete { return try await AueteAdapter().detail(id: id) }
         if site.nativeAdapter == .tuxiaobei { return try await TuxiaobeiAdapter().detail(id: id) }
         if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).detail(id: id) }
@@ -56,6 +58,7 @@ public struct TVAPIClient {
     }
 
     private func resolveLink(site: SourceSite, episode: Episode, flag: String, title: String) async throws -> MediaLink {
+        if site.nativeAdapter == .firstAid { return try FirstAidAdapter().resolve(episode: episode, title: title, group: site.name) }
         if site.nativeAdapter == .auete { return try await AueteAdapter().resolve(episode: episode, title: title, group: site.name) }
         if site.nativeAdapter == .bilibili { return try await BilibiliAdapter(site: site).resolve(episode: episode, title: title) }
         if site.nativeAdapter == .dm84 || site.nativeAdapter == .libvio { return try await HTMLSourceAdapter(site: site).resolve(episode: episode, title: title, group: site.name) }

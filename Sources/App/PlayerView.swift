@@ -179,7 +179,7 @@ final class PlaybackController: ObservableObject {
         if controller.player !== playback.player { controller.player = playback.player }
     }
 
-    @MainActor final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+    @MainActor final class Coordinator: NSObject, @preconcurrency AVPlayerViewControllerDelegate {
         weak var playback: PlaybackController?
         var observation: NSKeyValueObservation?
         init(playback: PlaybackController) { self.playback = playback }

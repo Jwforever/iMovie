@@ -13,6 +13,8 @@ final class PlaybackUITests: XCTestCase {
         app.launch()
     }
 
+    override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
+
     func testImportBrowsePlayAndBookmark() throws {
         app.tabBars.buttons["设置"].tap()
         app.buttons["config-import"].tap()
@@ -162,9 +164,10 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         let video = app.buttons["video-card-/Tv/neidi/zheyueliang/"]
         XCTAssertTrue(video.waitForExistence(timeout: 30))
-        for _ in 0..<4 {
-            if video.isHittable && video.frame.minY > 180 && video.frame.maxY < app.frame.height - 90 { break }
-            app.swipeUp()
+        for _ in 0..<7 {
+            if video.exists && video.isHittable && video.frame.minY > 180 && video.frame.maxY < app.frame.height - 90 { break }
+            if video.exists && video.frame.minY < 180 { app.swipeDown() }
+            else { app.swipeUp() }
         }
         capture("15-auete-home")
         video.tap()
@@ -244,11 +247,59 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(app.buttons["episode-第 1 集"].waitForExistence(timeout: 5))
         app.buttons["detail-back"].tap()
         app.tabBars.buttons["设置"].tap()
-        app.swipeUp()
+        for _ in 0..<4 {
+            if app.buttons["settings-about"].exists && app.buttons["settings-about"].isHittable { break }
+            app.swipeUp()
+        }
         app.buttons["settings-about"].tap()
         XCTAssertTrue(app.staticTexts["by Chris Wei"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.links["about-github"].exists || app.buttons["about-github"].exists)
         capture("26-about-imovie")
+    }
+
+    func testPosterCacheSurvivesRelaunchAndClearDownloadsAgain() throws {
+        let key = UUID().uuidString
+        app.terminate()
+        app.launchEnvironment["IMOVIE_CONFIG_URL"] = "http://127.0.0.1:8765/tv?image=" + key
+        app.launch()
+        app.tabBars.buttons["设置"].tap()
+        app.buttons["config-import"].tap()
+        XCTAssertTrue(app.staticTexts["兼容情况"].waitForExistence(timeout: 15))
+        app.tabBars.buttons["首页"].tap()
+        XCTAssertTrue(app.buttons["video-card-1"].waitForExistence(timeout: 10))
+        app.swipeUp()
+        app.buttons["video-card-1"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
+        XCTAssertTrue(app.buttons["episode-第 1 集"].waitForExistence(timeout: 5))
+        XCTAssertEqual(try imageRequests(key), 1)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["video-card-1"].waitForExistence(timeout: 10))
+        XCTAssertEqual(try imageRequests(key), 1, "应用重启后应从磁盘复用海报")
+        app.tabBars.buttons["设置"].tap()
+        for _ in 0..<4 {
+            if app.buttons["clear-image-cache"].exists && app.buttons["clear-image-cache"].isHittable { break }
+            app.swipeUp()
+        }
+        app.buttons["clear-image-cache"].tap()
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["video-card-1"].waitForExistence(timeout: 10))
+        app.swipeUp()
+        app.buttons["video-card-1"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
+        XCTAssertTrue(app.buttons["episode-第 1 集"].waitForExistence(timeout: 5))
+        XCTAssertEqual(try imageRequests(key), 2, "清理后才重新请求海报")
+        capture("27-poster-cache")
+    }
+
+    private func imageRequests(_ key: String) throws -> Int {
+        let ready = expectation(description: "Image request counter")
+        var count = -1
+        URLSession.shared.dataTask(with: URL(string: "http://127.0.0.1:8765/image-stats?key=" + key)!) { data, _, _ in
+            if let data, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Int] { count = root["requests"] ?? -1 }
+            ready.fulfill()
+        }.resume()
+        wait(for: [ready], timeout: 5)
+        return count
     }
 
     private func assertPlaying() {
