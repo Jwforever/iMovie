@@ -27,4 +27,4 @@ xcodebuild \
 
 python3 scripts/package_ipa.py \
   "$PROJECT_ROOT/build/DerivedData/Build/Products/Release-iphoneos/iMovie.app" \
-  "$PROJECT_ROOT/dist/iMovie-0.5.0-unsigned.ipa"
+  "$PROJECT_ROOT/dist/iMovie-0.5.1-unsigned.ipa"

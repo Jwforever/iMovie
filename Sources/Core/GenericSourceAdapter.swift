@@ -31,6 +31,30 @@ public struct GenericSourceAdapter {
     private let http = HTTPClient()
     public init(site: SourceSite) { self.site = site }
 
+    /// 插件里的选择器常写成 TVBox 风格：`h2 a@href`、`a.pic img@src`。
+    /// SwiftSoup 只认纯 CSS，把 `@属性` 拆出来单独取，避免整条规则失效。
+    struct SelectorSpec {
+        var css: String
+        var attribute: String?
+
+        static func parse(_ raw: String?) -> SelectorSpec? {
+            guard let raw else { return nil }
+            let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            if let at = text.lastIndex(of: "@"), at > text.startIndex {
+                let css = String(text[text.startIndex..<at]).trimmingCharacters(in: .whitespaces)
+                let attribute = String(text[text.index(after: at)...]).trimmingCharacters(in: .whitespaces)
+                if !css.isEmpty, !attribute.isEmpty, !attribute.contains(" "), !attribute.contains("[") {
+                    return SelectorSpec(css: css, attribute: attribute)
+                }
+            }
+            return SelectorSpec(css: text, attribute: nil)
+        }
+    }
+
+    static let defaultLinkSelectors = "h2 a[href], h3 a[href], h4 a[href], a.title[href], a.module-poster-item[href], a[href]"
+    static let defaultEpisodeContainers = "ul.episode-list,ul.play_list,ul.stui-content__playlist,ul.myui-content__playlist,.module-play-list,.play-list,.anthology-list-play,.playlist"
+
     public static func embeddedRule(_ value: Any?) -> GenericSourceRule? {
         guard let value else { return nil }
         let object: Any
@@ -144,18 +168,20 @@ public struct GenericSourceAdapter {
         let doc = try document(data, base: baseURL)
         let selector = rule.listSelector ?? "li[data-href], .carousel-item, .stui-vodlist > li, .myui-vodlist > li, .module-items .module-item, .public-list-box, .hl-vod-list > li, .vodlist > li, .fed-list-item, .module-search-item, div.item"
         var seen = Set<String>(), videos: [Video] = []
+        let linkSpec = selectorSpec(rule.linkSelector, fallback: defaultLinkSelectors, attribute: "href")
+        let posterSpec = selectorSpec(rule.posterSelector, fallback: "img", attribute: nil)
         for item in try doc.select(selector).array() {
-            let linkSelector = rule.linkSelector ?? "h2 a[href], h3 a[href], h4 a[href], a.title[href], a.module-poster-item[href], a[href]"
-            guard let link = try item.select(linkSelector).first(),
-                  let url = HTTPAddress.optional(try link.attr("href"), relativeTo: baseURL), sameSite(url, baseURL), seen.insert(url.absoluteString).inserted else { continue }
-            let image = try item.select(rule.posterSelector ?? "img").first()
-            var title = try item.select(rule.titleSelector ?? "h2,h3,h4,.title,.module-poster-item-title,.public-list-title").text()
+            guard let link = try item.select(linkSpec.css).first() else { continue }
+            let href = try link.attr(linkSpec.attribute ?? "href")
+            guard let url = HTTPAddress.optional(href, relativeTo: baseURL), sameSite(url, baseURL), seen.insert(url.absoluteString).inserted else { continue }
+            let image = try item.select(posterSpec.css).first()
+            var title = try text(rule.titleSelector, in: item, fallback: "h2,h3,h4,.title,.module-poster-item-title,.public-list-title")
             if title.isEmpty { title = try link.attr("title") }
             if title.isEmpty { title = try image?.attr("alt") ?? "" }
             if title.isEmpty { title = try link.text() }
             guard !title.isEmpty else { continue }
             let poster = try imageURL(image, fallback: item, base: baseURL)
-            let note = try item.select(rule.noteSelector ?? ".hdtag,.pic-text,.module-item-note,.public-list-prb,.desc").text()
+            let note = try text(rule.noteSelector, in: item, fallback: ".hdtag,.pic-text,.module-item-note,.public-list-prb,.desc")
             videos.append(Video(id: url.absoluteString, title: title, poster: poster, note: note, summary: "", playFrom: "", playURL: ""))
         }
         var categoryIDs = Set<String>(), categories: [VideoCategory] = []
@@ -172,15 +198,24 @@ public struct GenericSourceAdapter {
 
     static func decodeDetail(_ data: Data, baseURL: URL, rule: GenericSourceRule, id: String) throws -> Video {
         let doc = try document(data, base: baseURL)
-        let title = try doc.select(rule.detailTitleSelector ?? "h1.detail-title,h1.v_title,.stui-content__detail h1,.myui-content__detail h1,.module-info-heading h1,h1").first()?.text() ?? ""
+        let title = try text(rule.detailTitleSelector, in: doc, fallback: "h1.detail-title,h1.v_title,.stui-content__detail h1,.myui-content__detail h1,.module-info-heading h1,h1")
         guard !title.isEmpty else { throw ViewerError.message("规则未识别到影片标题，请设置详情标题选择器。") }
-        let lists = try doc.select(rule.lineSelector ?? "ul.episode-list,ul.play_list,ul.stui-content__playlist,ul.myui-content__playlist,.module-play-list,.play-list,.anthology-list-play,.playlist").array()
+        var lists = try doc.select(rule.lineSelector ?? defaultEpisodeContainers).array()
+        // 插件里的“线路”字符串有时是线路标题（如 div.card-header span b）而不是选集容器，
+        // 这种元素里没有 <a>，此时退回标准选集容器，避免整页选集被判为空。
+        let usable = lists.contains { element in
+            guard let links = try? element.select("a[href]") else { return false }
+            return !links.isEmpty
+        }
+        if !usable { lists = try doc.select(defaultEpisodeContainers).array() }
         var names: [String] = [], blocks: [String] = []
         let containers = lists.isEmpty ? [doc.body()].compactMap { $0 } : lists
         for (index, list) in containers.enumerated() {
             var seen = Set<String>(), episodes: [String] = []
-            let selector = rule.episodeSelector ?? (lists.isEmpty ? "a[href*='/play'],a[href*='/vodplay'],a[href$='.m3u8'],a[href$='.mp4']" : "a[href]")
-            for link in try list.select(selector).array() {
+            var links = try list.select(rule.episodeSelector ?? "a[href]").array()
+            // episodeSelector 自带容器前缀（如 ul.episode-list li > a），在容器内部再选必然为空。
+            if links.isEmpty { links = try list.select("a[href]").array() }
+            for link in links {
                 guard let url = HTTPAddress.optional(try link.attr("href"), relativeTo: baseURL), (sameSite(url, baseURL) || HTTPAddress.isMedia(url.absoluteString)), seen.insert(url.absoluteString).inserted else { continue }
                 let label = try link.text().replacingOccurrences(of: "$", with: " ").replacingOccurrences(of: "#", with: " ")
                 episodes.append((label.isEmpty ? "播放" : label) + "$" + url.absoluteString)
@@ -191,6 +226,22 @@ public struct GenericSourceAdapter {
         let image = try doc.select(rule.posterSelector ?? ".detail-poster img,.stui-content__thumb img,.myui-content__thumb img,.module-info-poster img,meta[property=og:image]").first()
         let summary = try doc.select(rule.summarySelector ?? ".detail-info-body,.detail-content,.module-info-introduction,.vod_content,.content_desc,[property=og:description]").text()
         return Video(id: id, title: title, poster: try imageURL(image, fallback: nil, base: baseURL), note: "", summary: summary, playFrom: names.joined(separator: "$$$"), playURL: blocks.joined(separator: "$$$"))
+    }
+
+    static func selectorSpec(_ raw: String?, fallback: String, attribute: String?) -> SelectorSpec {
+        if let spec = SelectorSpec.parse(raw) { return spec }
+        return SelectorSpec(css: fallback, attribute: attribute)
+    }
+
+    /// 读取选择器命中的值：带 `@属性` 时取属性，取不到再退回文本。
+    static func text(_ raw: String?, in scope: Element, fallback: String) throws -> String {
+        let spec = selectorSpec(raw, fallback: fallback, attribute: nil)
+        guard let element = try scope.select(spec.css).first() else { return "" }
+        if let attribute = spec.attribute {
+            let value = try element.attr(attribute)
+            if !value.isEmpty { return value }
+        }
+        return try element.text()
     }
 
     private static func imageURL(_ element: Element?, fallback: Element?, base: URL) throws -> String {

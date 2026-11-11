@@ -270,6 +270,7 @@ private final class LiveCertificateDelegate: NSObject, AVAssetResourceLoaderDele
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var controller = PlaybackController()
+    @StateObject private var orientation = PlaybackOrientation()
     let media: MediaLink
 
     var body: some View {
@@ -297,8 +298,21 @@ private final class LiveCertificateDelegate: NSObject, AVAssetResourceLoaderDele
             }
             .background(Theme.backdrop)
             .navigationTitle("正在播放").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("完成") { controller.stop(); dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { orientation.toggle() } label: {
+                        Image(systemName: orientation.isLandscape
+                              ? "rectangle.portrait.arrowtriangle.2.inward"
+                              : "rectangle.expand.vertical")
+                    }
+                    .accessibilityLabel(orientation.isLandscape ? "切回竖屏" : "横屏播放")
+                    .accessibilityIdentifier("player-orientation")
+                }
+                ToolbarItem(placement: .navigationBarTrailing) { Button("完成") { controller.stop(); dismiss() } }
+            }
         }
+        .onAppear { orientation.start() }
+        .onDisappear { orientation.stop() }
         .task {
             let position = store.position(for: media)
             controller.onProgress = { [weak store] in store?.record($0, position: $1) }

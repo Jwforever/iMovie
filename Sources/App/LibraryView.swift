@@ -58,7 +58,12 @@ import SwiftUI
     @State private var filter = ""
 
     private var sites: [SourceSite] {
-        (store.config?.sites ?? []).filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
+        let filtered = (store.config?.sites ?? []).filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
+        // 按最近一次真实拉取结果排序：出过片的在前，没测过的居中，失败的沉底；同分保持配置顺序。
+        return filtered.enumerated().sorted { lhs, rhs in
+            let left = store.rank(of: lhs.element), right = store.rank(of: rhs.element)
+            return left == right ? lhs.offset < rhs.offset : left > right
+        }.map(\.element)
     }
 
     var body: some View {
@@ -93,6 +98,14 @@ import SwiftUI
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
+                if let health = store.health[site.key] {
+                    Image(systemName: health.ok && health.items > 0 ? "checkmark.seal.fill"
+                          : (health.ok ? "circle.dashed" : "exclamationmark.triangle.fill"))
+                        .font(.caption)
+                        .foregroundStyle(health.ok && health.items > 0 ? Theme.accent
+                                         : (health.ok ? Color.secondary : Color.orange))
+                        .accessibilityLabel(health.ok && health.items > 0 ? "上次有内容" : "上次没有内容")
+                }
                 if store.homeSource?.id == site.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent) }
                 else if !site.isNative { Image(systemName: "wrench.and.screwdriver").foregroundStyle(.secondary) }
             }.padding(.vertical, 5)
@@ -347,8 +360,14 @@ import SwiftUI
             if !result.categories.isEmpty { categories = result.categories }
             page = requestedPage
             pageCount = result.pageCount
+            store.recordHealth(site.key, ok: true, items: videos.count)
         } catch is CancellationError { }
-        catch { if requestToken == token { self.error = error.localizedDescription } }
+        catch {
+            if requestToken == token {
+                self.error = error.localizedDescription
+                store.recordHealth(site.key, ok: false, items: 0)
+            }
+        }
     }
 }
 

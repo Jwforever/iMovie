@@ -1,4 +1,4 @@
-# iMovie 0.5.0 · iOS 私人播放器
+# iMovie 0.5.1 · iOS 私人播放器
 
 原生 SwiftUI iPhone / iPad 应用，iOS 16 及以上。**0.5.0 起不再有任何站点域名硬编码**：应用打开配置时，从配置的 `spider` 字段下载插件包，在设备内静态解开 `jar → *.guard → 明文 classes.dex`，再从插件里读出每个采集器的域名、搜索模板与 CSS 选择器，交给统一采集引擎请求网页并由 AVPlayer 播放。站点换域名只需重新导入配置，不需要重编 IPA。
 
@@ -136,7 +136,7 @@ GenericSourceAdapter        SwiftSoup 采集列表、详情、选集 → MediaRe
 
 ## 安装与第一次使用
 
-1. 用你自己的签名工具重签 `dist/iMovie-0.5.0-unsigned.ipa`，装到 iPhone / iPad。
+1. 用你自己的签名工具重签 `dist/iMovie-0.5.1-unsigned.ipa`，装到 iPhone / iPad。
 2. 「设置」已默认填入 `http://www.饭太硬.cc/tv`，点「导入 / 更新配置」。导入后会在后台预热插件解析。
 3. 「首页」左上角选择点播源；首次打开某个源时才按需解规则，之后走本机缓存。
 4. 详情页选集后上方直接播放，不加载原播放网页。
@@ -154,8 +154,8 @@ bash scripts/build-unsigned.sh
 脚本先跑 `swift test`（含插件包回归测试），再生成工程、编译 arm64 Release、检查 Mach-O 与平台后打包：
 
 ```text
-dist/iMovie-0.5.0-unsigned.ipa
-dist/iMovie-0.5.0-unsigned.ipa.sha256
+dist/iMovie-0.5.1-unsigned.ipa
+dist/iMovie-0.5.1-unsigned.ipa.sha256
 ```
 
 Windows 无法编译 iOS 应用；本仓库通过 `.github/workflows/ios.yml` 在 macOS runner 上构建，Actions 产物 `iMovie-unsigned-ipa` 即签名前 IPA。

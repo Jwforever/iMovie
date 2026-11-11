@@ -13,6 +13,17 @@ struct PlaybackRequest: Identifiable {
     var media: MediaLink
 }
 
+/// 一个来源最近一次实际拉取的结果。用来把真正能出内容的源排在前面，
+/// 而不是让所有源按配置顺序平铺。
+struct SourceHealth: Codable, Hashable {
+    var ok: Bool
+    var items: Int
+    var at: Date
+
+    /// 有内容 3，空列表 1，失败 0
+    var rank: Int { ok ? (items > 0 ? 3 : 1) : 0 }
+}
+
 @MainActor
 final class AppStore: ObservableObject {
     static let defaultConfigURL = "http://www.饭太硬.cc/tv"
@@ -27,6 +38,7 @@ final class AppStore: ObservableObject {
     @Published var error: String?
     @Published var playback: PlaybackRequest?
     @Published private(set) var homeSourceKey: String
+    @Published private(set) var health: [String: SourceHealth] = [:]
     private var sourceRules: [String: GenericSourceRule]
 
     var homeSource: SourceSite? {
@@ -58,9 +70,20 @@ final class AppStore: ObservableObject {
         config = Self.load(SourceConfig.self, key: "config", defaults: storage)
         favorites = Self.load([MediaLink].self, key: "favorites", defaults: storage) ?? []
         history = Self.load([WatchRecord].self, key: "history", defaults: storage) ?? []
+        health = Self.load([String: SourceHealth].self, key: "sourceHealth", defaults: storage) ?? [:]
         sourceRules = Self.load([String: GenericSourceRule].self, key: "sourceRules", defaults: storage) ?? [:]
         SpiderSource.shared.update(config?.spider)
     }
+
+    /// 记录来源最近一次真实拉取的结果，用来把能出内容的源排到前面。
+    func recordHealth(_ key: String, ok: Bool, items: Int) {
+        if let previous = health[key], previous.ok == ok, previous.items == items, Date().timeIntervalSince(previous.at) < 30 { return }
+        health[key] = SourceHealth(ok: ok, items: items, at: Date())
+        persist(health, key: "sourceHealth")
+    }
+
+    /// 3 有内容，2 未测过，1 拉到空列表，0 请求失败
+    func rank(of site: SourceSite) -> Int { health[site.key]?.rank ?? 2 }
 
     func importConfig() async {
         guard !importing else { return }
