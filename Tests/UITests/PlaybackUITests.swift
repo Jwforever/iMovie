@@ -40,6 +40,7 @@ final class PlaybackUITests: XCTestCase {
         app.segmentedControls.buttons["播放记录"].tap()
         XCTAssertTrue(app.staticTexts["播放验证样片 · 第 1 集"].firstMatch.exists)
         app.tabBars.buttons["首页"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["最近播放"].waitForExistence(timeout: 5))
         capture("12-home-with-recent")
     }
@@ -112,7 +113,7 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["第二来源样片"].waitForExistence(timeout: 10))
     }
 
-    func testAueteSearchAndEpisodes() throws {
+    func testAueteBrowseEpisodesAndSearchVerification() throws {
         app.terminate()
         app.launchEnvironment["IMOVIE_CONFIG_URL"] = "http://www.饭太硬.cc/tv"
         app.launch()
@@ -130,11 +131,13 @@ final class PlaybackUITests: XCTestCase {
         source.tap()
         let query = app.textFields["site-search-query"]
         XCTAssertTrue(query.waitForExistence(timeout: 10))
-        query.tap()
-        query.typeText("折月亮\n")
         let video = app.staticTexts["折月亮"].firstMatch
+        for _ in 0..<4 {
+            if video.exists && video.isHittable { break }
+            app.swipeUp()
+        }
         XCTAssertTrue(video.waitForExistence(timeout: 35))
-        capture("15-auete-search")
+        capture("15-auete-home")
         video.tap()
         XCTAssertTrue(app.buttons["第1集"].firstMatch.waitForExistence(timeout: 30))
         capture("16-auete-episodes")

@@ -4,6 +4,7 @@ import SwiftUI
     @EnvironmentObject private var store: AppStore
     @State private var choosingSource = false
     @State private var openingLink = false
+    @State private var queuedMedia: MediaLink?
 
     var body: some View {
         Group {
@@ -42,7 +43,12 @@ import SwiftUI
             }
         }
         .sheet(isPresented: $choosingSource) { SourcePickerView().environmentObject(store) }
-        .sheet(isPresented: $openingLink) { DirectLinkView().environmentObject(store) }
+        .sheet(isPresented: $openingLink, onDismiss: {
+            if let media = queuedMedia { queuedMedia = nil; store.play(media) }
+        }) {
+            DirectLinkView { media in queuedMedia = media; openingLink = false }
+                .environmentObject(store)
+        }
     }
 }
 
@@ -97,6 +103,7 @@ import SwiftUI
     @Environment(\.dismiss) private var dismiss
     @State private var directURL = ""
     @State private var openAsWebPage = false
+    var onPlay: (MediaLink) -> Void
 
     var body: some View {
         NavigationStack {
@@ -123,11 +130,7 @@ import SwiftUI
         do {
             let url = try HTTPAddress.parse(directURL)
             let media = MediaLink(title: url.lastPathComponent.isEmpty ? "地址播放" : url.lastPathComponent, url: url.absoluteString, group: openAsWebPage ? "网页" : "直链", kind: openAsWebPage ? .web : .direct)
-            dismiss()
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 350_000_000)
-                store.play(media)
-            }
+            onPlay(media)
         } catch { store.error = error.localizedDescription }
     }
 }
@@ -146,6 +149,7 @@ import SwiftUI
     @State private var loading = false
     @State private var error: String?
     @State private var requestToken = UUID()
+    @State private var verifyingSource = false
     private let client = TVAPIClient()
     private var isHome: Bool { category.isEmpty && activeSearch.isEmpty }
 
@@ -180,6 +184,10 @@ import SwiftUI
                         .accessibilityIdentifier("home-content-heading")
                         if let error {
                             EmptyPanel(icon: "wifi.exclamationmark", title: "加载失败", message: error)
+                            if site.nativeAdapter == .auete {
+                                Button("在网页中验证后重试") { verifyingSource = true }
+                                    .buttonStyle(.borderedProminent).accessibilityIdentifier("source-verify")
+                            }
                             Button("重试") { Task { await load(reset: true) } }.buttonStyle(.bordered)
                         }
                         if !loading && error == nil && videos.isEmpty {
@@ -224,6 +232,11 @@ import SwiftUI
         .background(Theme.backdrop)
         .navigationTitle(embedded ? "" : Theme.sourceName(site.name)).navigationBarTitleDisplayMode(.inline)
         .task { if site.isNative && videos.isEmpty { await load(reset: true) } }
+        .sheet(isPresented: $verifyingSource, onDismiss: { Task { await load(reset: true) } }) {
+            if let url = try? AueteAdapter.pageURL(category: category, search: activeSearch, page: 1) {
+                SourceVerificationView(url: url)
+            }
+        }
     }
 
     private func categoryButton(_ title: String, id: String) -> some View {

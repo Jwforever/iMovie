@@ -17,6 +17,8 @@ struct SiteSearchResult: Identifiable {
     @State private var work: Task<Void, Never>?
     @State private var requestID = UUID()
     @State private var total = 0
+    @State private var verifyingSource = false
+    @State private var verificationTarget: SourceSearchTarget?
 
     var body: some View {
         List {
@@ -58,6 +60,12 @@ struct SiteSearchResult: Identifiable {
                             Spacer()
                             Button("重试") { retry(result.target) }.font(.caption)
                         }
+                        if result.site.nativeAdapter == .auete {
+                            Button("在网页中验证后重试") {
+                                verificationTarget = result.target
+                                verifyingSource = true
+                            }.font(.caption)
+                        }
                     }
                     if result.videos.isEmpty && result.error == nil { Text("没有匹配内容").font(.caption).foregroundStyle(.secondary) }
                     ForEach(result.videos) { video in
@@ -82,6 +90,13 @@ struct SiteSearchResult: Identifiable {
         .scrollContentBackground(.hidden).background(Theme.backdrop)
         .navigationTitle("搜索")
         .onDisappear { work?.cancel(); searching = false }
+        .sheet(isPresented: $verifyingSource, onDismiss: {
+            if let target = verificationTarget { retry(target) }
+        }) {
+            if let url = try? AueteAdapter.pageURL(category: nil, search: submitted, page: 1) {
+                SourceVerificationView(url: url)
+            }
+        }
     }
 
     private func search() {
