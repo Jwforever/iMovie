@@ -168,7 +168,7 @@ final class PlaybackUITests: XCTestCase {
         source.tap()
         let query = app.textFields["site-search-query"]
         XCTAssertTrue(query.waitForExistence(timeout: 10))
-        let video = app.buttons["video-card-/Tv/neidi/zheyueliang/"]
+        let video = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "video-card-")).firstMatch
         XCTAssertTrue(video.waitForExistence(timeout: 30))
         capture("31-live-douban-home")
         // Short drags keep the poster below the pinned header. Full-screen swipes
@@ -184,9 +184,10 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(video.isHittable && video.frame.minY > 220 && video.frame.maxY < app.frame.height - 100)
         capture("15-auete-home")
         video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
-        XCTAssertTrue(app.buttons["第1集"].firstMatch.waitForExistence(timeout: 30))
+        let firstEpisode = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "episode-")).firstMatch
+        XCTAssertTrue(firstEpisode.waitForExistence(timeout: 30))
         capture("16-auete-episodes")
-        app.buttons["第1集"].firstMatch.tap()
+        firstEpisode.tap()
         assertPlaying()
         XCTAssertEqual(app.webViews.count, 0)
         capture("18-auete-system-playing")

@@ -195,6 +195,20 @@ final class DalvikExecutionTests: XCTestCase {
         do { _ = try await task.value; XCTFail("取消后应停止网络等待") }
         catch { XCTAssertTrue(error is CancellationError) }
     }
+
+    func testRealCollectorExecutesPluginHtmlParser() throws {
+        let fixture = try XCTUnwrap(Bundle.module.url(forResource: "Fixtures/spider", withExtension: "jar"))
+        let dex = try GuardContainer.innerDex(from: Data(contentsOf: fixture))
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [CollectorHTTPFixture.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let result = try DalvikSpider.execute(dex: dex, shortName: "Auete", action: .home, ext: "", httpSession: session)
+        let page = try XCTUnwrap(CatVodPayload.page(result.json), result.json)
+        XCTAssertTrue(page.videos.contains { $0.title == "解释器执行样片" }, result.json)
+        XCTAssertFalse(result.requests.isEmpty, "必须通过插件的 HTTP 垫片读取 HTML")
+        XCTAssertGreaterThan(result.steps, 100)
+    }
 }
 
 private final class DalvikHTTPFixture: URLProtocol {
@@ -205,6 +219,23 @@ private final class DalvikHTTPFixture: URLProtocol {
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: [:])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data("{\"list\":[]}".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+private final class CollectorHTTPFixture: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let html = """
+        <!doctype html><html><body><ul class="nav"><li><a href="/Movie/">电影</a></li></ul>
+        <ul class="threadlist"><li><a class="pic" href="/Movie/test/"><img src="https://poster.test/cover.jpg"></a>
+        <h2><a href="/Movie/test/">解释器执行样片</a></h2><span class="hdtag">HD</span></li></ul></body></html>
+        """
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "text/html; charset=utf-8"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(html.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
     override func stopLoading() {}
