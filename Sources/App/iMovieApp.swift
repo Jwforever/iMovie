@@ -45,7 +45,7 @@ enum Theme {
                 .tabItem { Label("设置", systemImage: "slider.horizontal.3") }.tag(4)
         }
         .onChange(of: tab) { if $0 == 1 { searchSession = UUID() } }
-        .sheet(item: $store.playback) { request in
+        .fullScreenCover(item: $store.playback) { request in
             PlayerSheet(media: request.media).environmentObject(store)
         }
         .overlay {

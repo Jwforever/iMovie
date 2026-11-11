@@ -85,6 +85,18 @@ final class AppStore: ObservableObject {
     /// 3 有内容，2 未测过，1 拉到空列表，0 请求失败
     func rank(of site: SourceSite) -> Int { health[site.key]?.rank ?? 2 }
 
+    /// 试拉一个来源的首屏，结果写进 health，让列表能自己把可用的排上去。
+    func probe(_ site: SourceSite) async {
+        guard site.isNative else { return }
+        do {
+            let page = try await TVAPIClient().page(site: site, page: 1)
+            recordHealth(site.key, ok: true, items: page.videos.count)
+        } catch is CancellationError {
+        } catch {
+            recordHealth(site.key, ok: false, items: 0)
+        }
+    }
+
     func importConfig() async {
         guard !importing else { return }
         importing = true

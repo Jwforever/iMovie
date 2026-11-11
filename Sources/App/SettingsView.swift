@@ -31,6 +31,7 @@ import SwiftUI
                     LabeledContent("直播列表", value: "\(config.lives.count)")
                     LabeledContent("更新于", value: config.importedAt.formatted(date: .abbreviated, time: .shortened))
                     NavigationLink("来源地址 / 通用规则") { SourceRulesView() }.accessibilityIdentifier("settings-source-rules")
+                    NavigationLink("插件解释器（实验）") { PluginLabView() }.accessibilityIdentifier("settings-plugin-lab")
                     Text("插件源不执行安卓代码：应用在设备内解开配置指定的 spider 包，从插件里读出站点域名与选择器，再按网页规则采集。域名变化只需重新导入配置，不用重装 App。")
                         .font(.caption).foregroundStyle(.secondary)
                 }

@@ -245,14 +245,15 @@ final class PlaybackUITests: XCTestCase {
         app.buttons["detail-back"].tap()
     }
 
-    func testRecommendationCarouselAndAbout() throws {
+    func testHomeContentAndAbout() throws {
         app.tabBars.buttons["设置"].tap()
         app.buttons["config-import"].tap()
         XCTAssertTrue(app.staticTexts["兼容情况"].waitForExistence(timeout: 15))
         app.tabBars.buttons["首页"].tap()
-        let first = app.buttons["recommendation-1"]
+        XCTAssertTrue(app.staticTexts["热播推荐"].waitForExistence(timeout: 10))
+        let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "video-card-")).firstMatch
         XCTAssertTrue(first.waitForExistence(timeout: 10))
-        capture("25-site-carousel")
+        capture("25-home-content")
         first.tap()
         XCTAssertTrue(app.buttons["episode-第 1 集"].waitForExistence(timeout: 5))
         app.buttons["detail-back"].tap()

@@ -27,8 +27,11 @@ enum GuardRuleBuilder {
     private static let noteHintPattern = regex("(tag|note|remark|desc|hdtag|badge)", caseInsensitive: true)
     private static let detailTitlePattern = regex("(detail-title|v_title|title)", caseInsensitive: true)
     private static let summaryPattern = regex("(detail-des|desc|content|intro|summary)", caseInsensitive: true)
-    private static let episodePattern = regex("(episode|play_list|playlist)", caseInsensitive: true)
-    private static let linePattern = regex("(tab_control|card-header|play-from)", caseInsensitive: true)
+    private static let episodePattern = regex("(episode|playlist|play_list|play-list|paly_list)", caseInsensitive: true)
+    /// 线路容器常见命名：play-card / playlist-panel / play_list / player_list。
+    private static let containerPattern = regex("(play-card|playlist|play_list|play-list|paly_list|player_list|episode-list)", caseInsensitive: true)
+    /// 线路名所在的头部：card-header / tab_control / play-from。
+    private static let lineNameHintPattern = regex("(header|tab_control|play-from|playfrom|line-title)", caseInsensitive: true)
     private static let trailingPagePattern = regex("(page|pg|p)=$")
 
     private static let noise = [
@@ -136,11 +139,18 @@ enum GuardRuleBuilder {
         if let value = detailSelectors.first(where: { matches(summaryPattern, $0) }) {
             rule.summarySelector = value
         }
-        if let value = detailSelectors.first(where: { matches(episodePattern, $0) }) {
-            rule.episodeSelector = value
+        // 选集 / 线路 / 线路名必须按结构分工，不能按名字猜：
+        // 选集选择器最后一个 token 一定是 a；线路容器是包住它的那一层；
+        // 线路名是容器头部里的粗体/标题文字。
+        let episodeSelectors = detailSelectors.filter(isEpisodeSelector)
+        if let best = bestEpisodeSelector(episodeSelectors) {
+            rule.episodeSelector = best
         }
-        if let value = detailSelectors.first(where: { matches(linePattern, $0) }) {
-            rule.lineSelector = value
+        if let value = detailSelectors.first(where: isLineNameSelector) {
+            rule.lineNameSelector = value
+        }
+        if let container = lineContainer(for: rule.episodeSelector, in: detailSelectors) {
+            rule.lineSelector = container
         }
         return rule
     }
@@ -155,6 +165,55 @@ enum GuardRuleBuilder {
     }
 
     // MARK: - 选择器判定
+
+    /// 最后一个 token 是 a，才是"点进去"的链接选择器（选集 / 列表项共用这个判据）。
+    static func isEpisodeSelector(_ value: String) -> Bool {
+        guard isSelector(value) else { return false }
+        guard let last = tokens(of: value).last else { return false }
+        return last == "a" || last.hasPrefix("a.") || last.hasPrefix("a[") || last.hasPrefix("a:")
+    }
+
+    static func bestEpisodeSelector(_ values: [String]) -> String? {
+        values.max { episodeScore($0) < episodeScore($1) }
+    }
+
+    private static func episodeScore(_ value: String) -> Int {
+        var score = value.count
+        if matches(episodePattern, value) { score += 40 }
+        if value.contains("li") { score += 12 }
+        if value.contains("play") { score += 8 }
+        return score
+    }
+
+    /// 线路名：容器头部里的 `b / span / h3` 之类文字节点。
+    static func isLineNameSelector(_ value: String) -> Bool {
+        guard isSelector(value), !isEpisodeSelector(value) else { return false }
+        guard let last = tokens(of: value).last else { return false }
+        guard ["b", "span", "h3", "h4", "em", "strong", "i", "small"].contains(last) else { return false }
+        return matches(lineNameHintPattern, value)
+    }
+
+    /// 线路容器 = 包住选集的那一层。插件里通常叫 play-card / playlist-panel / play_list。
+    static func lineContainer(for episode: String?, in values: [String]) -> String? {
+        let candidates = values.filter { value in
+            guard isSelector(value), !isEpisodeSelector(value) else { return false }
+            guard let first = tokens(of: value).first else { return false }
+            return first.hasPrefix("div") || first.hasPrefix("ul") || first.hasPrefix("section")
+        }
+        if let hit = candidates.first(where: { matches(containerPattern, $0) && tokens(of: $0).first?.hasPrefix("div") == true }) {
+            return hit
+        }
+        if let hit = candidates.first(where: { matches(containerPattern, $0) }) { return hit }
+        // 都没有就把选集选择器最后一段 a 去掉，剩下的就是容器。
+        guard let episode else { return nil }
+        let parts = tokens(of: episode)
+        guard parts.count > 1, let last = parts.last, last == "a" || last.hasPrefix("a.") else { return nil }
+        return parts.dropLast().joined(separator: " ")
+    }
+
+    private static func tokens(of value: String) -> [String] {
+        value.split(whereSeparator: { $0 == " " || $0 == ">" }).map(String.init)
+    }
 
     static func isSelector(_ value: String) -> Bool {
         let text = value.trimmingCharacters(in: .whitespacesAndNewlines)

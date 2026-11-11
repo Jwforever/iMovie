@@ -249,10 +249,11 @@ private final class LiveCertificateDelegate: NSObject, AVAssetResourceLoaderDele
 
 @MainActor struct PlaybackSurface: View {
     @ObservedObject var controller: PlaybackController
+    var fills = false
+
     var body: some View {
         NativeVideoPlayer(playback: controller)
-            .aspectRatio(16.0 / 9.0, contentMode: .fit).background(.black)
-            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .modifier(PlaybackSurfaceStyle(fills: fills))
             .accessibilityIdentifier("native-player")
             .accessibilityValue(controller.isPlaying ? "playing" : "waiting")
             .overlay(alignment: .bottomLeading) {
@@ -265,6 +266,20 @@ private final class LiveCertificateDelegate: NSObject, AVAssetResourceLoaderDele
     }
 }
 
+private struct PlaybackSurfaceStyle: ViewModifier {
+    var fills: Bool
+
+    func body(content: Content) -> some View {
+        if fills {
+            content.background(.black)
+        } else {
+            content.aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .background(.black)
+                .clipShape(RoundedRectangle(cornerRadius: 15))
+        }
+    }
+}
+
 @MainActor struct PlayerSheet: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
@@ -274,43 +289,26 @@ private final class LiveCertificateDelegate: NSObject, AVAssetResourceLoaderDele
     let media: MediaLink
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    if controller.resolving { ProgressView("正在提取视频链接…") }
-                    PlaybackSurface(controller: controller)
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(media.title).font(.title3.bold())
-                            Text(media.group).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button { store.toggleFavorite(media) } label: {
-                            Image(systemName: store.isFavorite(media) ? "bookmark.fill" : "bookmark").font(.title3)
-                        }.accessibilityLabel(store.isFavorite(media) ? "取消收藏" : "收藏")
+        GeometryReader { proxy in
+            let landscape = proxy.size.width > proxy.size.height
+            ZStack {
+                Color.black.ignoresSafeArea()
+                if landscape {
+                    PlaybackSurface(controller: controller, fills: true)
+                        .ignoresSafeArea()
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 22) {
+                            if controller.resolving { ProgressView("正在提取视频链接…").tint(.white).foregroundStyle(.white) }
+                            PlaybackSurface(controller: controller)
+                            details
+                        }.padding(20)
                     }
-                    if let error = controller.error {
-                        Text(error).font(.subheadline).foregroundStyle(.orange)
-                        Button("重新连接") { controller.prepare(media, resume: controller.position, force: true) }.buttonStyle(.bordered)
-                    }
-                    Text("全屏、投屏和画中画可通过播放器控件开启。").font(.caption).foregroundStyle(.secondary)
-                }.padding(20)
-            }
-            .background(Theme.backdrop)
-            .navigationTitle("正在播放").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button { orientation.toggle() } label: {
-                        Image(systemName: orientation.isLandscape
-                              ? "rectangle.portrait.arrowtriangle.2.inward"
-                              : "rectangle.expand.vertical")
-                    }
-                    .accessibilityLabel(orientation.isLandscape ? "切回竖屏" : "横屏播放")
-                    .accessibilityIdentifier("player-orientation")
                 }
-                ToolbarItem(placement: .navigationBarTrailing) { Button("完成") { controller.stop(); dismiss() } }
             }
+            .overlay(alignment: .topTrailing) { closeButton }
         }
+        .statusBarHidden()
         .onAppear { orientation.start() }
         .onDisappear { orientation.stop() }
         .task {
@@ -321,5 +319,44 @@ private final class LiveCertificateDelegate: NSObject, AVAssetResourceLoaderDele
         .onChange(of: scenePhase) { phase in
             if phase != .active { store.record(media, position: controller.position) }
         }
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(media.title).font(.title3.bold()).foregroundStyle(.white)
+                    Text(media.group).font(.caption).foregroundStyle(.white.opacity(0.6))
+                }
+                Spacer()
+                Button { store.toggleFavorite(media) } label: {
+                    Image(systemName: store.isFavorite(media) ? "bookmark.fill" : "bookmark")
+                        .font(.title3).foregroundStyle(.white)
+                }.accessibilityLabel(store.isFavorite(media) ? "取消收藏" : "收藏")
+            }
+            if let error = controller.error {
+                Text(error).font(.subheadline).foregroundStyle(.orange)
+                Button("重新连接") { controller.prepare(media, resume: controller.position, force: true) }
+                    .buttonStyle(.bordered)
+            }
+            Text("点开播放器控件可全屏；横过来画面会自动铺满。")
+                .font(.caption).foregroundStyle(.white.opacity(0.5))
+        }
+    }
+
+    private var closeButton: some View {
+        Button {
+            controller.stop()
+            dismiss()
+        } label: {
+            Text("完成")
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.white.opacity(0.16), in: Capsule())
+                .foregroundStyle(.white)
+        }
+        .padding(.trailing, 16)
+        .padding(.top, 10)
+        .accessibilityIdentifier("player-close")
     }
 }

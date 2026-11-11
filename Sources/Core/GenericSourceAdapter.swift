@@ -20,7 +20,11 @@ public struct GenericSourceRule: Codable, Hashable {
     public var categorySelector: String? = nil
     public var detailTitleSelector: String? = nil
     public var summarySelector: String? = nil
+    /// 一条线路一整块的容器，例如 `div.play-card#player_list`。
     public var lineSelector: String? = nil
+    /// 线路名字，通常在容器头部，例如 `div.card-header span b`。
+    public var lineNameSelector: String? = nil
+    /// 选集链接，例如 `ul.episode-list li > a`。
     public var episodeSelector: String? = nil
     public var headers: [String: String]? = nil
     public init(baseURL: String) { self.baseURL = baseURL }
@@ -200,33 +204,107 @@ public struct GenericSourceAdapter {
         let doc = try document(data, base: baseURL)
         let title = try text(rule.detailTitleSelector, in: doc, fallback: "h1.detail-title,h1.v_title,.stui-content__detail h1,.myui-content__detail h1,.module-info-heading h1,h1")
         guard !title.isEmpty else { throw ViewerError.message("规则未识别到影片标题，请设置详情标题选择器。") }
-        var lists = try doc.select(rule.lineSelector ?? defaultEpisodeContainers).array()
-        // 插件里的“线路”字符串有时是线路标题（如 div.card-header span b）而不是选集容器，
-        // 这种元素里没有 <a>，此时退回标准选集容器，避免整页选集被判为空。
-        let usable = lists.contains { element in
-            guard let links = try? element.select("a[href]") else { return false }
-            return !links.isEmpty
-        }
-        if !usable { lists = try doc.select(defaultEpisodeContainers).array() }
+
+        // 线路 = 一整块（容器 + 头部名字 + 集数列表）。插件给的 lineSelector 有时是
+        // 线路名（如 div.card-header span b）或干脆没有，所以容器要能自证"里面确实有链接"。
+        var containers = try links(in: doc, selector: rule.lineSelector)
+        if containers.isEmpty { containers = autoLineContainers(doc, episodeSelector: rule.episodeSelector) }
+        if containers.isEmpty { containers = [doc.body()].compactMap { $0 } }
+
         var names: [String] = [], blocks: [String] = []
-        let containers = lists.isEmpty ? [doc.body()].compactMap { $0 } : lists
-        for (index, list) in containers.enumerated() {
+        for (index, container) in containers.enumerated() {
             var seen = Set<String>(), episodes: [String] = []
-            var links = try list.select(rule.episodeSelector ?? "a[href]").array()
-            // episodeSelector 自带容器前缀（如 ul.episode-list li > a），在容器内部再选必然为空。
-            if links.isEmpty { links = try list.select("a[href]").array() }
-            for link in links {
-                guard let url = HTTPAddress.optional(try link.attr("href"), relativeTo: baseURL), (sameSite(url, baseURL) || HTTPAddress.isMedia(url.absoluteString)), seen.insert(url.absoluteString).inserted else { continue }
+            for link in try episodeLinks(in: container, rule: rule) {
+                guard let url = HTTPAddress.optional(try link.attr("href"), relativeTo: baseURL),
+                      sameSite(url, baseURL) || HTTPAddress.isMedia(url.absoluteString),
+                      seen.insert(url.absoluteString).inserted else { continue }
                 let label = try link.text().replacingOccurrences(of: "$", with: " ").replacingOccurrences(of: "#", with: " ")
                 episodes.append((label.isEmpty ? "播放" : label) + "$" + url.absoluteString)
             }
-            if !episodes.isEmpty { names.append("线路 \(index + 1)"); blocks.append(episodes.joined(separator: "#")) }
+            guard !episodes.isEmpty else { continue }
+            names.append(lineName(in: container, rule: rule, fallback: "线路 \(index + 1)"))
+            blocks.append(episodes.joined(separator: "#"))
         }
         guard !blocks.isEmpty else { throw ViewerError.message("已读取详情，但没有找到选集。可设置选集 / 线路选择器；网盘、登录或磁力线路需要相应规则。") }
         let image = try doc.select(rule.posterSelector ?? ".detail-poster img,.stui-content__thumb img,.myui-content__thumb img,.module-info-poster img,meta[property=og:image]").first()
         let summary = try doc.select(rule.summarySelector ?? ".detail-info-body,.detail-content,.module-info-introduction,.vod_content,.content_desc,[property=og:description]").text()
         return Video(id: id, title: title, poster: try imageURL(image, fallback: nil, base: baseURL), note: "", summary: summary, playFrom: names.joined(separator: "$$$"), playURL: blocks.joined(separator: "$$$"))
     }
+
+    /// 选择器命中的、内部确实有 `a[href]` 的元素；线路标题那种空壳会被剔除。
+    private static func links(in scope: Document, selector: String?) throws -> [Element] {
+        guard let selector, !selector.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+        return try scope.select(selector).array().filter { element in
+            ((try? element.select("a[href]").array()) ?? []).isEmpty == false
+        }
+    }
+
+    /// 容器内按"规则选择器 → 去掉容器前缀 → 任意链接"逐级放宽，
+    /// 因为插件写的 `ul.episode-list li > a` 自带前缀，在 ul 内部再选会永远为空。
+    private static func episodeLinks(in container: Element, rule: GenericSourceRule) throws -> [Element] {
+        if let raw = rule.episodeSelector {
+            let spec = SelectorSpec.parse(raw)
+            if let css = spec?.css, !css.isEmpty, let found = try? container.select(css).array(), !found.isEmpty {
+                return found
+            }
+            let parts = raw.split(whereSeparator: { $0 == " " || $0 == ">" }).map(String.init)
+            if parts.count > 1, let last = parts.last, let found = try? container.select(last).array(), !found.isEmpty {
+                return found
+            }
+        }
+        return ((try? container.select("a[href]").array()) ?? []).filter { link in
+            guard let href = try? link.attr("href") else { return false }
+            return playLinkPattern.map { $0.firstMatch(in: href, range: NSRange(href.startIndex..., in: href)) } != nil
+        }
+    }
+
+    private static func lineName(in container: Element, rule: GenericSourceRule, fallback: String) -> String {
+        var value = ""
+        if let raw = rule.lineNameSelector, let spec = SelectorSpec.parse(raw),
+           let element = try? container.select(spec.css).first() {
+            value = (try? element.text()) ?? ""
+            if let attribute = spec.attribute, value.isEmpty { value = (try? element.attr(attribute)) ?? "" }
+        }
+        if value.isEmpty, let header = try? container.select("div.card-header,h3,.card-header,.module-info-heading,h2").first() {
+            value = (try? header.text()) ?? ""
+        }
+        value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "『』「」《》 ").union(.whitespaces))
+        return value.isEmpty || value.count > 30 ? fallback : value
+    }
+
+    /// 规则没给出可用容器时，把播放链接按"各自最近的共同父级"归组。
+    private static func autoLineContainers(_ doc: Document, episodeSelector: String?) -> [Element] {
+        let all = (try? doc.select("a[href]").array()) ?? []
+        let plays = all.filter { link in
+            guard let href = try? link.attr("href"), let pattern = playLinkPattern else { return false }
+            return pattern.firstMatch(in: href, range: NSRange(href.startIndex..., in: href)) != nil
+        }
+        guard !plays.isEmpty else { return [] }
+        for depth in 1...5 {
+            var groups: [String: [Element]] = [:]
+            for link in plays {
+                var node: Element? = link
+                for _ in 0..<depth { node = node?.parent() }
+                guard let candidate = node else { continue }
+                groups[signature(candidate), default: []].append(candidate)
+            }
+            guard let best = groups.max(by: { $0.value.count < $1.value.count }) else { continue }
+            var unique: [Element] = []
+            for element in best.value where !unique.contains(where: { $0 === element }) { unique.append(element) }
+            if unique.count >= 1 { return unique }
+        }
+        return []
+    }
+
+    private static func signature(_ element: Element) -> String {
+        let classes = ((try? element.attr("class")) ?? "").trimmingCharacters(in: .whitespaces)
+        let identifier = (try? element.attr("id")) ?? ""
+        return element.tagName() + "#" + identifier + "." + classes
+    }
+
+    private static let playLinkPattern = try? NSRegularExpression(
+        pattern: "(/play|play-\\d|/vodplay|vod-play|/v/|watch\\?|/episode|/vod/|\\.m3u8|\\.mp4)", options: [.caseInsensitive])
 
     static func selectorSpec(_ raw: String?, fallback: String, attribute: String?) -> SelectorSpec {
         if let spec = SelectorSpec.parse(raw) { return spec }

@@ -147,7 +147,7 @@ import WebKit
                 ToolbarItem(placement: .navigationBarLeading) { Button { controller.load() } label: { Image(systemName: "arrow.clockwise") } }
                 ToolbarItem(placement: .navigationBarTrailing) { Button("完成") { dismiss() } }
             }
-            .sheet(item: $nativeRequest) { request in PlayerSheet(media: request.media).environmentObject(store) }
+            .fullScreenCover(item: $nativeRequest) { request in PlayerSheet(media: request.media).environmentObject(store) }
         }
         .onAppear { controller.load(); store.record(media, position: store.position(for: media)) }
         .onDisappear { controller.stop() }

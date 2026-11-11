@@ -56,11 +56,16 @@ import SwiftUI
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var filter = ""
+    @State private var probing = false
 
     private var sites: [SourceSite] {
         let filtered = (store.config?.sites ?? []).filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
-        // 按最近一次真实拉取结果排序：出过片的在前，没测过的居中，失败的沉底；同分保持配置顺序。
+        // 排序：默认源固定第一；其余按最近一次真实拉取结果，出过片的在前，
+        // 没测过的居中，失败的沉底；同分保持配置顺序。
         return filtered.enumerated().sorted { lhs, rhs in
+            let leftDefault = lhs.element.key == store.homeSource?.key
+            let rightDefault = rhs.element.key == store.homeSource?.key
+            if leftDefault != rightDefault { return leftDefault }
             let left = store.rank(of: lhs.element), right = store.rank(of: rhs.element)
             return left == right ? lhs.offset < rhs.offset : left > right
         }.map(\.element)
@@ -83,6 +88,25 @@ import SwiftUI
             .searchable(text: $filter, prompt: "查找点播来源")
             .navigationTitle("选择点播源").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
+            .task { await probeUntested() }
+        }
+    }
+
+    /// 首次打开时把还没试过的来源各拉一次首屏，结果写进 health，
+    /// 列表随即按"能用的在前"自己重排。
+    private func probeUntested() async {
+        guard !probing else { return }
+        probing = true
+        defer { probing = false }
+        let targets = (store.config?.sites ?? []).filter { $0.isNative && store.health[$0.key] == nil }
+        var index = 0
+        while index < targets.count {
+            if Task.isCancelled { break }
+            let slice = Array(targets[index..<min(index + 4, targets.count)])
+            await withTaskGroup(of: Void.self) { group in
+                for site in slice { group.addTask { await store.probe(site) } }
+            }
+            index += 4
         }
     }
 
@@ -186,9 +210,6 @@ import SwiftUI
                     LazyVStack(alignment: .leading, spacing: 22, pinnedViews: [.sectionHeaders]) {
                       Section {
                         if isHome { recentSection }
-                        if isHome, error == nil, !videos.isEmpty {
-                            recommendationCarousel
-                        }
                         HStack {
                             Text(activeSearch.isEmpty ? (isHome ? "热播推荐" : (categories.first { $0.id == category }?.name ?? "全部内容")) : "搜索结果")
                                 .font(.title3.bold())
@@ -263,24 +284,6 @@ import SwiftUI
             } else {
                 store.error = "还没有解出这个来源的网站地址，可以先在“来源规则”里填写。"
             }
-        }
-    }
-
-    @ViewBuilder private var recommendationCarousel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("今日推荐").font(.title3.bold())
-                Spacer()
-                Text("本站热播").font(.caption).foregroundStyle(.secondary)
-            }
-            TabView {
-                    ForEach(Array(videos.prefix(6))) { video in
-                        NavigationLink { VideoDetailView(site: site, video: video) } label: {
-                            FeaturedVideoCard(video: video, source: Theme.sourceName(site.name)).contentShape(Rectangle())
-                        }.buttonStyle(.plain).accessibilityIdentifier("recommendation-\(video.id)")
-                    }
-            }.tabViewStyle(.page(indexDisplayMode: .always)).frame(height: 240)
-                .accessibilityIdentifier("home-carousel")
         }
     }
 
@@ -368,39 +371,6 @@ import SwiftUI
                 store.recordHealth(site.key, ok: false, items: 0)
             }
         }
-    }
-}
-
-@MainActor struct FeaturedVideoCard: View {
-    let video: Video
-    let source: String
-    var rating: Double? = nil
-
-    var body: some View {
-        Color.clear.frame(height: 215)
-            .background(Theme.panel)
-            .overlay(alignment: .trailing) {
-                CachedPosterImage(url: HTTPAddress.optional(video.poster))
-                    .frame(width: 185, height: 215).clipped().allowsHitTesting(false).accessibilityHidden(true)
-            }
-            .overlay {
-                LinearGradient(colors: [Theme.panel, Theme.panel.opacity(0.88), Theme.panel.opacity(0.05)], startPoint: .leading, endPoint: .trailing)
-            }
-            .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 11) {
-                    Text(rating.map { "豆瓣 \(String(format: "%.1f", $0))" } ?? "今日推荐")
-                        .font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
-                    Text(video.title).font(.system(size: 25, weight: .bold)).foregroundStyle(.white).lineLimit(2)
-                        .frame(maxWidth: 230, alignment: .leading)
-                    Text(rating == nil ? (video.note.isEmpty ? source : video.note) : source).font(.caption).foregroundStyle(.white.opacity(0.65)).lineLimit(2)
-                    Label(rating == nil ? "查看影片" : "查找片源", systemImage: "play.fill").font(.caption.bold()).foregroundStyle(Theme.backdrop)
-                        .padding(.horizontal, 13).padding(.vertical, 9).background(Theme.accent, in: Capsule())
-                }.padding(21)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 22))
-            .contentShape(Rectangle())
-            .accessibilityElement(children: .ignore).accessibilityLabel("今日推荐：\(video.title)")
-            .accessibilityIdentifier("home-featured")
     }
 }
 
