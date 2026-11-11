@@ -1,6 +1,11 @@
 name: Build unsigned iOS app
 "on":
   workflow_dispatch:
+    inputs:
+      runtime_only:
+        description: Run plugin runtime regressions and live source diagnostics
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -16,11 +21,17 @@ jobs:
       - name: Probe additional source connectivity
         run: python3 scripts/probe_additional_sources.py
       - name: Test and build
-        run: bash scripts/build-unsigned.sh
+        run: |
+          if [ "${{ inputs.runtime_only }}" = "true" ]; then
+            IMOVIE_SOURCE_DIAGNOSTICS=1 swift test
+          else
+            bash scripts/build-unsigned.sh
+          fi
       - name: Unit test report
         if: always()
         run: git status --short
       - name: Upload unsigned IPA
+        if: ${{ !inputs.runtime_only }}
         uses: actions/upload-artifact@v4
         with:
           name: iMovie-unsigned-ipa
@@ -31,6 +42,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Simulator playback smoke tests
+        if: ${{ !inputs.runtime_only }}
         run: bash scripts/test-simulator.sh
       - name: Upload simulator evidence
         if: always()
@@ -42,3 +54,10 @@ jobs:
             build/SimulatorTests.xcresult/
           if-no-files-found: warn
           retention-days: 7
+      - name: Upload plugin diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-source-diagnostics
+          path: dist/plugin-source-diagnostics.json
+          if-no-files-found: ignore
