@@ -166,13 +166,20 @@ final class PlaybackUITests: XCTestCase {
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         let video = app.buttons["video-card-/Tv/neidi/zheyueliang/"]
         XCTAssertTrue(video.waitForExistence(timeout: 30))
-        for _ in 0..<7 {
-            if video.exists && video.isHittable && video.frame.minY > 180 && video.frame.maxY < app.frame.height - 90 { break }
-            if video.exists && video.frame.minY < 180 { app.swipeDown() }
-            else { app.swipeUp() }
+        capture("31-live-douban-home")
+        // Short drags keep the poster below the pinned header. Full-screen swipes
+        // can oscillate past it when the live carousel changes the page height.
+        for _ in 0..<10 {
+            if video.exists && video.isHittable && video.frame.minY > 220 && video.frame.maxY < app.frame.height - 100 { break }
+            let midpoint = video.exists ? video.frame.midY : app.frame.height
+            let distance = max(-220, min(220, app.frame.height * 0.52 - midpoint))
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55 + distance / app.frame.height))
+            start.press(forDuration: 0.05, thenDragTo: end)
         }
+        XCTAssertTrue(video.isHittable && video.frame.minY > 220 && video.frame.maxY < app.frame.height - 100)
         capture("15-auete-home")
-        video.tap()
+        video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)).tap()
         XCTAssertTrue(app.buttons["第1集"].firstMatch.waitForExistence(timeout: 30))
         capture("16-auete-episodes")
         app.buttons["第1集"].firstMatch.tap()

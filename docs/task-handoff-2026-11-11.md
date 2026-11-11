@@ -1,108 +1,73 @@
 # iMovie 任务恢复摘要
 
-恢复时间：2026-11-11，北京时间。由旧对话的文字历史、当前源码、交付文件和构建记录交叉整理；没有重新载入旧图片。
+更新：2026-11-11，Asia/Shanghai。继续时优先读取本文、当前源码和 `dist/build-info.json`，无需重新导入旧聊天或原始大图。
 
-## 0.4.0 交付更新（最新，优先读取）
+## 用户要求和执行偏好
 
-- 完成海报整张点击、详情页初始封面简介 / 选集后原位系统播放、隐藏系统及自绘倍速、横屏生命周期修复；视频播放不展示或执行 WKWebView，仅验证码入口保留网页。
-- 首页改为豆瓣高分 6 页轮播（至少 7 分 / 100 人评价，真实公开榜单），点击查当前源同名影片；评分失败回退来源推荐。
-- 全局搜索左侧 92 点窄来源栏（首项全部源），右侧按完整片名 / 前缀 / 包含 / 字符相关度递减排序，可直接过滤。
-- 关于页已加介绍、GitHub `https://github.com/Jwforever/iMovie`、开发者 `by Chris Wei`。仓库仍为私有。
-- 图片两级缓存、重复请求合并，32 MB 内存 / 120 MB 磁盘 / 14 天；片库 3 分钟、豆瓣 6 小时、16 MB 磁盘；设置可清理。搜索 / 配置 / 视频取址实时请求。
-- 新增急救教学本机适配；合计 12 条目 / 6 实现，34 Android 条目 + 2 drpy 仍未移植，不能声称全源完成。完整逐源状态在 `docs/source-port-status.json`。
-- 最终构建 `42962316622`，应用代码提交 `8f52b961e7f161d20db1328a2173d1a71c11a26a`；32 核心、8 UI、8 Python、1 浏览器测试全部通过，0 跳过。UI 覆盖真实奥特和动漫巴士 HTTP 取址 / 详情内播放、旋转且画面 / 进度持续、卡片四位置点击、搜索排序过滤、轮播关于、图片缓存重启复用 / 清理。
-- 当前产物 `dist/iMovie-0.4.0-unsigned.ipa`（build 4）、源码 / 交付 zip。支持 iOS 16+ arm64，物理 iPhone / 签名安装未测。详情和截图见 `docs/validation.md` 与 `dist/build-info.json`。
-- 保持上下文轻量：不要重新载入旧图片 / 整段旧聊天。需要 QA 时只看最终小尺寸 JPEG 联系图。
+- 开发 iPhone 独立运行的 iMovie，兼容用户的饭太硬 / TVBox 配置；不依赖 Android 设备或用户自建解析服务器。
+- 交付未签名 IPA，用户自行签名；同时交付源码 ZIP、完整交付 ZIP 和校验值。
+- 全部 Android 来源开放，按奥特思路走统一处理，允许逐源报错，不能以测试没通过为由隐藏来源。
+- 新源沿用已有结构时应通过更新地址 / 数据规则工作；只有全新协议才需要继续开发引擎。不能把“所有来源可尝试”表述成“原 Guard 已完整兼容 / 所有线路保证播放”。
+- 自主完成工作，不反复索取确认。当前没有授权额外子代理。不要修改其他项目或根工作区 Git。
 
-## 0.3.0 交付更新（优先读取）
+## 当前版本与功能
 
-本摘要下方保留恢复时的 0.2.0 状态。最新代码已完成这轮首页改版与搜索调度修复，新增奥特本机适配，交付版本为 **0.3.0，build 3**。
+0.4.0，build 4，iOS 16+，iPhoneOS arm64，SwiftUI / Swift / AVPlayer。
 
-- 用户要求参考 TVBox / OK 影视源码；已核查对应开源实现，记录在 `docs/tvbox-reference.md`。SwiftUI / Swift 代码独立编写。
-- 首页现有切源记忆、顶部分类、推荐卡片、海报网格、最近播放；全局搜索最多 4 个站点并发、合并 B站分类别名、来源独立报错与重试。
-- 原配置的 11 个条目由 5 套本机适配识别；奥特与动漫巴士完整播放通过模拟器，B站 / 兔小贝仍限已有网络验证，立播受站点限制。其余 35 个 Android 条目和 2 个 drpy 条目尚不支持。
-- 奥特关键词搜索有网站验证码，应用内提供用户手动验证与 Cookie 共享入口；自动化只验证页面能打开，未代填验证码或验证完整搜索恢复。
-- 最终构建 `42954727744`，应用代码提交 `bd37dca7d5bc8d7f7c1e0c4ce5442abcd80964f2`；25 项 Swift、5 项模拟器 UI 全部通过，0 跳过，另有 8 项 Python / 1 项浏览器测试通过。中途两次动漫巴士连接失败已记录，有限重试后的最终构建恢复完整播放。
-- 产物：`dist/iMovie-0.3.0-unsigned.ipa`、`dist/iMovie-0.3.0-source.zip`、`dist/iMovie-0.3.0-delivery.zip`；校验、截图、签名安装说明见交付包。支持 iOS 16+ arm64，实体 iPhone 安装和签名未测试。
-- 后续读取代码和本文即可恢复，不要重新载入旧对话所有图片。截图 QA 使用小尺寸 JPEG，原始截图在 `dist/screenshots/0.3.0/`。
+- 海报整张点击进入详情，初始只显示封面简介；选集才取址，播放器在详情页顶部替换简介。
+- 视频通过 HTTP 媒体元素、命名播放器配置、奥特公开 Base64 数据、有限 iframe 递归与原站公开接口取址；播放不展示 / 执行 WKWebView。
+- `AVPlayerViewController.speeds = []` 隐藏倍速，移除自绘倍速。播放器对象与会话在旋转 / 全屏过程中保留；UIKit 容器管理布局和恢复播放。
+- 豆瓣公开榜单至少 7 分 / 100 人评价，按评分 / 评价人数选 6 部左右滑动轮播；点击查当前源同名作品；失败回退来源推荐。
+- 搜索左栏 92 点，首项全部源；右侧按完整片名、前缀、包含、字符相关度递减排序。先展示影片，后展示错误；4 个来源持续并发；B站分类合并，未知 CSP 各条目独立。
+- 关于页有介绍、版本、GitHub、`by Chris Wei`。仓库 `Jwforever/iMovie` 仍为私有。
+- 图片内存 32 MB / 磁盘 120 MB / 14 天，跨页面和重启复用；片库 3 分钟、豆瓣 6 小时、合计磁盘 16 MB。设置可清理。配置 / 搜索 / 视频取址不走片库缓存。
 
-## 任务目标与用户要求
+## 通用源适配（最新重点）
 
-- 开发类似 OK 影视的 iOS 影视应用，应用名称为 **iMovie**，导入用户提供的饭太硬 / TVBox 配置。
-- 用户自行签名安装未签名 IPA。
-- 必须在 iPhone 内独立采集、解析和播放；用户没有安卓设备，也不希望维护配套解析服务器。
-- 支持 iOS 16 及以上。当前技术为 SwiftUI、Swift 原生来源适配、WKWebView 媒体识别与 AVPlayer。
-- 原配置地址已经保存在项目 README 和默认导入设置中，无需用户重新提供。
+`GenericSourceAdapter` 为全部未知 `csp_` 条目提供公共 HTML / JSON 浏览、搜索、详情、选集及 HTTP 取址。默认识别奥特和 MacCMS 常见结构；读取 ext JSON / 可读 Base64 JSON / 远程 JSON / 官网 URL。新类名无需加入逐源名单。
 
-## 最新需求：尚未完成
+`GenericSourceRule` 支持 baseURL、auto/html/json、搜索 / 分类 / 详情 / 播放模板、CSS 选择器及请求头。配置支持 `ios` / `iMovie` 对象；设置可本机覆盖，重启和配置更新后保留；恢复默认回到最近导入配置的原规则。无 `{page}` 模板时跟随实际下一页链接。
 
-用户在 2026-11-11 09:00 提出，后续中断 / 重试时仍是这项需求：
+样本：48 点播 / 6 直播；45 Android 条目涉及 37 实现。11 Android 条目用专用适配，剩余 34 全部开放通用尝试；兔小贝另有专用适配，共 12 专用条目。虎牙 / 斗鱼 2 个 drpy 条目没有完整脚本宿主。
 
-> 页面好丑啊，你能不能参考ok影视的ui？ 主页选择一个点播源后，像电视一样，会有热播 最近播放，上面有类型，参考ok影视ui。另外你现在搜索只有两个源可以用‘
+奥特与 DM84 已有真实网站的 iOS HTTP 取址 / 嵌入播放证据。B站、兔小贝和急救限电脑端网络探测；立播受 403 限制。多数加固 / 网盘 / 签名协议未实现，只有类名无法推导域名，来源失败时可补充地址或规则。源开放不要求逐源验证通过。
 
-接下来需要完成两件事：
+## 构建与证据
 
-1. 参考 OK 影视的界面组织重做首页：选择点播源后进入该源的内容首页，上方提供类型 / 分类，页面包含热播和最近播放入口；改善目前界面观感。
-2. 排查用户实际只能搜索两个来源的原因，修复现有适配问题并继续增加可用来源。必须区分“配置可导入”“适配代码存在”“实际搜索成功”和“完整播放已验证”。
+- 当前候选构建：`42969169687`，应用提交 `05495dfc45bf2dce7eccedd0076c3df9f1600b8d`。最终状态及准确测试结果以 `docs/validation.md`、`dist/build-info.json` 为准。
+- 前一通用框架构建 `42967802081` 已成功：36 核心 + 9 UI，0 失败 / 跳过。当前候选增加实际下一页测试、规则保存 / 重启流程、原配置恢复修复和搜索影片优先。
+- 本地 Python 工具 8 项、Edge 浏览器观察脚本 1 项通过。
+- 最终产物路径：`dist/iMovie-0.4.0-unsigned.ipa`、`dist/iMovie-0.4.0-source.zip`、`dist/iMovie-0.4.0-delivery.zip`。若缺失，说明尚需完成最终证据下载与打包，不能声称已交付。
+- 物理 iPhone、用户签名安装、AirPlay 和画中画没有实测。
 
-当前没有找到这轮 UI 改版或新增来源已经交付的证据。现有 0.2.0 是这条需求提出之前的版本。
+## 代码入口
 
-## 已交付版本与证据
+- `Sources/Core/GenericSourceAdapter.swift`：公共采集、规则、分页。
+- `Sources/Core/Models.swift`、`ConfigDecoder.swift`、`TVAPIClient.swift`：能力识别、规则导入、路由。
+- `Sources/App/SourceRulesView.swift`、`AppStore.swift`：规则界面和持久化。
+- `Sources/App/LibraryView.swift`、`SearchView.swift`、`SettingsView.swift`：首页 / 详情 / 搜索 / 设置。
+- `Sources/App/PlayerView.swift`、`Sources/Core/MediaResolver.swift`：稳定播放器会话与 HTTP 取址。
+- `Sources/App/ImageCache.swift`、`Sources/Core/CatalogCache.swift`：缓存。
+- `Tests/CoreTests/GenericSourceTests.swift`、`Tests/UITests/PlaybackUITests.swift`：通用框架与完整流程。
+- `docs/generic-source-rules.md`：用户规则示例；`docs/source-port-status.json`：逐源开放及限制。
 
-- 项目目录：`C:/Users/junti/Documents/ChatGPT/MyWorkSpace/iMovie`
-- 已交付版本：**0.2.0，build 2**，iPhoneOS arm64、未签名。
-- IPA：`dist/iMovie-0.2.0-unsigned.ipa`，1,130,921 字节。
-- 完整交付包：`dist/iMovie-0.2.0-delivery.zip`。
-- 源码包：`dist/iMovie-0.2.0-source.zip`。
-- 说明与证据：`README.md`、`docs/quick-start.md`、`docs/validation.md`、`dist/build-info.json`、`dist/simulator-test-summary.txt`。
-- 最终构建记录：GitHub Actions `42803822395`，提交 `5aefc6fe66c9572e315f2ee3fbdc2e6d4e00f685`。
-- 构建环境：Xcode 16.4 / iOS SDK 18.5；本地电脑是 Windows，使用 macOS GitHub Actions 编译。
+Windows 工作目录：`C:/Users/junti/Documents/ChatGPT/MyWorkSpace/iMovie`，无 Xcode / Swift。云端 Xcode 16.4 / iOS SDK 18.5，macOS Actions 编译。
 
-旧版已实现：配置导入、分类和搜索、部分来源的详情及选集、网页播放与媒体识别、系统播放、倍速、收藏、播放记录，以及重播时重新获取有时效的播放地址。
+辅助脚本在 `../artifacts/imovie-development/`：
 
-2026-11-10 的记录显示：21 项 Swift 核心测试、3 项 iOS 模拟器界面测试、8 项 Python 工具测试、1 项浏览器测试通过。真实饭太硬配置 → 动漫巴士搜索 → 详情选集 → WebKit 识别 HLS → AVPlayer 播放，已在 iPhone 16 / iOS 18.5 模拟器完成。实体 iPhone 签名安装、AirPlay 和画中画仍未实测。
+```text
+cloud_build.py upload
+cloud_build.py dispatch
+cloud_build.py logs RUN_ID
+download_evidence.py RUN_ID
+package_delivery.py RUN_ID BUILD_SHA
+write_port_status.py
+```
 
-本次恢复只读取既有证据，没有重新运行这些测试。
+上传仅使用独立的 `cloud-checkout/`，凭证从已有 Git 凭证助手读入内存，禁止输出或落盘令牌。打包器要求成功构建、测试无失败、IPA 校验及应用源码与构建一致；构建后仅允许 README / docs 更新。
 
-## 来源兼容状态
+## 避免历史请求失败
 
-原配置有 48 个点播条目（45 个 Android 爬虫条目、3 个 drpy 条目）和 6 个直播列表。iOS 使用独立适配，不直接执行原 Android DEX / ELF 插件。
+旧聊天 `01a1c434-7adc-7870-8b24-b97336258274` 的历史日志含约 5.7 MB 图片输出；此前两次模型请求约 6.2 MB，在路由模型前传输超时。短请求可用，不能简单判定模型不可用。
 
-| 来源 / 能力 | 已知状态 |
-| --- | --- |
-| 动漫巴士 / DM84 | 完成真实配置到系统播放的模拟器验证 |
-| B站公开内容 | 1 套适配对应 7 个配置条目；公开 API / 媒体网络探测通过，未完成该源的 iOS 播放验证 |
-| 儿童 / 启蒙（兔小贝） | 原生适配与公开 MP4 网络链路验证，未完成该源的 iOS 播放验证 |
-| 立播 / Libvio | 实验性适配；访问受限，未完成搜索 / 播放验证 |
-| 其余 36 个 Android 条目 | 尚未移植，不能因为配置导入成功就算可用 |
-| 虎牙 / 斗鱼 drpy 条目 | 完整 drpy 宿主尚未实现 |
-| JSON 类型 1 / 4 | 本地测试配置的浏览、搜索和播放流程通过；用户原配置没有这类源 |
-| 直播 | 有列表支持；其中 1 个配置列表依赖 Android localhost 代理，其他频道未逐一验证 |
-
-“本机移植（实验）10”是 4 套适配识别出的 10 个配置条目，不能等同于 10 个可用的独立站点。用户反馈“搜索只有两个源可以用”仍待按实际运行情况排查。
-
-## 继续开发时的入口
-
-- `Sources/App/LibraryView.swift`：片库、来源进入、分类和内容列表，首页改版的主要入口。
-- `Sources/App/SearchView.swift`：跨来源搜索界面。
-- `Sources/App/AppStore.swift`：配置、收藏及播放记录；已有 `history` 持久化，可用于最近播放。
-- `Sources/Core/Models.swift`、`Sources/Core/TVAPIClient.swift`：来源能力与请求路由。
-- `Sources/Core/HTMLSourceAdapter.swift`：DM84、Libvio。
-- `Sources/Core/BilibiliAdapter.swift`、`Sources/Core/TuxiaobeiAdapter.swift`：B站和兔小贝。
-- `Sources/App/WebPlayerView.swift`、`PlayerView.swift`：网页与系统播放。
-
-构建辅助脚本在项目外：`C:/Users/junti/Documents/ChatGPT/MyWorkSpace/artifacts/imovie-development/`。
-
-已有 `cloud_build.py` 支持 `upload`、`dispatch`、`status`、`logs RUN_ID`、`download RUN_ID`，另有 `download_evidence.py` 和 `package_delivery.py`。独立上传检出目录为 `cloud-checkout/`，远程仓库为用户的私有 `Jwforever/iMovie`。恢复本身没有上传或触发新的构建。
-
-工作区根目录属于另一个 Git 仓库，`iMovie/` 在根仓库中仍是未跟踪目录；继续开发时保留其他项目和未提交修改。
-
-## 旧对话为何卡住
-
-旧对话标题：**开发支持饭太硬资源的 iOS 影视应用**。
-
-旧对话 ID：`01a1c434-7adc-7870-8b24-b97336258274`。
-
-本地历史含 11 次 `view_image` 图片输出，编码数据约 5.7 MB。09:04 和 09:19 的 Magpie 错误明确指出，约 6.2 MB 的请求在两分钟内只收到 2.7 MB / 2.3 MB，还没路由到模型就终止。同一模型的短请求验证正常。
-
-继续工作时以此文字摘要和源码为上下文，按需查看少量必要文件 / 图片即可；无需重新导入整段旧对话。本次没有删除原会话、修改模型配置或创建新聊天。
+不要重新载入整个旧聊天或原始大截图。用文字摘要继续，视觉 QA 生成约 1080 像素宽、几十 KB 的 JPEG 联系图后读取。原始截图保留在 `dist/evidence/RUN_ID` 与 `dist/screenshots/0.4.0/`。

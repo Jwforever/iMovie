@@ -22,13 +22,13 @@
 
 同一 B站实现下的多个分类条目搜索相同公开接口，因此合并查询并显示覆盖的分类条目数。其余不同 JSON API 不因显示名称相同就合并。
 
-## Android 源为何仍需逐项适配
+## 统一接口与来源规则的关系
 
 [Spider 接口](https://github.com/FongMi/TV/blob/5b41d9da52e1573ab9b5d399d656d11eb9fe8557/catvod/src/main/java/com/github/catvod/crawler/Spider.java) 明确区分首页、分类、详情、搜索、播放。主应用提供这些入口，实际站点逻辑由配置指定的 Spider 实现。
 
 [JarLoader](https://github.com/FongMi/TV/blob/5b41d9da52e1573ab9b5d399d656d11eb9fe8557/app/src/main/java/com/fongmi/android/tv/api/loader/JarLoader.java) 使用 Android 的 `DexClassLoader` 与运行时。饭太硬当前的 Guard 插件不是这些播放器主仓库里自带的通用采集规则；读取开源播放器不能自动得到配置内全部加固爬虫的 iOS 实现。
 
-本轮补充 `csp_AueteGuard` / `csp_Auete` 的 Swift 适配。旧规则中的 `auete2so.php` 已失效，当前站点公开表单为 `auete4so.php`，海报列表、详情、选集也换了结构。适配依据站点当前公开页面，由 iPhone 读取播放页明确提供的公开 HLS；未找到时使用本机 WKWebView 播放。
+0.3 补充 `csp_AueteGuard` / `csp_Auete` 的 Swift 适配。旧规则中的 `auete2so.php` 已失效，当前站点公开表单为 `auete4so.php`，海报列表、详情、选集也换了结构。0.4 由 iPhone 通过 HTTP 读取播放页明确提供的公开 HLS，无法取得媒体地址时显示原因，播放不展示原网页。
 
 站点域名和访问限制会变化。立播旧域名和发布页指向的现行域名在本轮 macOS 探测中返回 HTTP 403；厂长多个入口也返回 403，不将它们记为已验证可用。
 
@@ -38,4 +38,6 @@
 
 新增急救教学 `csp_FirstAidGuard` / `csp_FirstAid` 的独立 Swift 实现。参考原仓库的 FirstAid 功能入口，实际解析依据当前 `m.youlai.cn/jijiu/` 公开目录和文章页；现搜索页面无视频结果，因此对公开目录标题本机筛选。未复制 Java 文件或把其带入应用。来源更新状态见 [逐源记录](source-port-status.json)。
 
-全部 Android Guard 兼容尚未实现。原配置为 45 个 Android 条目、37 个不同 API 实现，原 JAR 仍含 DEX、ELF 和加固资源；通用 HTTP 提取器只能处理已经取得的公开页面与媒体参数，无法替代未移植的网盘登录、直播签名、磁力和加固爬虫规则。
+新增 `GenericSourceAdapter` 公共采集框架：所有没有专用实现的 Android CSP 条目自动路由至奥特 / MacCMS / JSON 统一流程，允许直接选源与搜索，不设置逐源验证通过的开放条件。配置 / 本机数据规则可控制域名、地址模板、CSS 选择器和请求头；已有专用实现也可通过本机规则覆盖。具体字段见 [通用来源规则](generic-source-rules.md)。
+
+未来来源沿用已支持结构时，可更新数据而无需重新开发 App。只提供类名与加固参数时仍无法恢复真实域名；新协议需要扩展取址能力。原配置的 45 个 Android 条目中，11 个使用专用实现、34 个开放通用尝试；原 JAR 的 DEX / ELF 未执行，网盘登录、直播签名、磁力和原 Guard 协议没有全部实现。开放尝试与保证全源可播是不同的验证结论。

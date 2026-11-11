@@ -3,278 +3,416 @@
   "configuredAndroidEntries": 45,
   "distinctAndroidImplementations": 37,
   "nativeRecognizedAndroidEntries": 11,
-  "remainingAndroidEntries": 34,
+  "genericAttemptAndroidEntries": 34,
+  "allAndroidEntriesOpen": true,
+  "allAndroidProtocolsImplemented": false,
   "complete": false,
+  "meaning": "45 个 Android 条目全部可直接进入；11 个有专用实现，34 个走通用尝试。开放不以逐源验证通过为前提，也不代表执行原 Android Guard 包或全源可播放。另有兔小贝专用实现和 2 个未实现完整宿主的 drpy 条目。",
   "entries": [
     {
       "key": "点我切源",
       "name": "豆豆┃片单 <兼容安卓4>",
       "api": "csp_DouDouGuard",
-      "status": "未移植；推送 / 提示 / 片单功能不等同于普通影片播放源"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；推送 / 提示 / 片单不一定提供普通影片列表，可补充公开网址或规则后尝试"
     },
     {
       "key": "MDrive",
       "name": "🗂我的云盘┃配置",
       "api": "csp_MyDriveGuard",
-      "status": "未移植；网盘索引、登录会话与服务商取址链路尚未实现"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可尝试公开网页，网盘登录会话与服务商取址协议未实现，失败会显示实际原因"
     },
     {
       "key": "玩偶",
       "name": "👽玩偶哥哥┃4K弹幕",
       "api": "csp_WoGGGuard",
-      "status": "未移植；网盘索引、登录会话与服务商取址链路尚未实现"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可尝试公开网页，网盘登录会话与服务商取址协议未实现，失败会显示实际原因"
     },
     {
       "key": "YGP",
       "name": "🚀荐影┃预告片",
       "api": "csp_YGPGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "MTV1",
       "name": "🎙️易听┃音乐",
       "api": "csp_MusicGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "seed",
       "name": "💡聚剧┃四盘",
       "api": "csp_SeedhubGuard",
-      "status": "未移植；配置参数为不可直接读取的二进制封装，原 Guard 实现未公开"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；配置参数含不可直接读取的二进制封装，可能需要补充官网 / JSON 接口；未实现原 Guard 协议"
     },
     {
       "key": "光影",
       "name": "🌞光影┃不卡",
       "api": "csp_T4Guard",
-      "status": "未移植；配置参数为不可直接读取的二进制封装，原 Guard 实现未公开"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；配置参数含不可直接读取的二进制封装，可能需要补充官网 / JSON 接口；未实现原 Guard 协议"
     },
     {
       "key": "厂长",
       "name": "📔厂长┃不卡",
       "api": "csp_NewCzGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "海绵",
       "name": "🐬海绵┃不卡",
       "api": "csp_HmysGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "立播",
       "name": "🌟立播┃不卡",
       "api": "csp_LibvioGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "实验适配；现行站点受 HTTP 403 限制"
     },
     {
       "key": "瓜子",
       "name": "👀瓜子┃不卡",
       "api": "csp_AppgzGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "比特",
       "name": "🍄比特┃不卡",
       "api": "csp_BttwooGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "糯米",
       "name": "🍓糯米┃秒播",
       "api": "csp_NmyswvGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "文采",
       "name": "💮文采┃秒播",
       "api": "csp_JpysGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "奶酪",
       "name": "🧀奶酪┃秒播",
       "api": "csp_T4Guard",
-      "status": "未移植；配置参数为不可直接读取的二进制封装，原 Guard 实现未公开"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；配置参数含不可直接读取的二进制封装，可能需要补充官网 / JSON 接口；未实现原 Guard 协议"
     },
     {
       "key": "热播",
       "name": "📺热播┃多线",
       "api": "csp_AppTTGuard",
-      "status": "未移植；配置参数为不可直接读取的二进制封装，原 Guard 实现未公开"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；配置参数含不可直接读取的二进制封装，可能需要补充官网 / JSON 接口；未实现原 Guard 协议"
     },
     {
       "key": "风云",
       "name": "☁️风云┃多线",
       "api": "csp_FyGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "视界",
       "name": "🌸茉莉┃多线",
       "api": "csp_App99Guard",
-      "status": "未移植；配置参数为不可直接读取的二进制封装，原 Guard 实现未公开"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；配置参数含不可直接读取的二进制封装，可能需要补充官网 / JSON 接口；未实现原 Guard 协议"
     },
     {
       "key": "剧圈",
       "name": "🐻剧圈┃多线",
       "api": "csp_AppSxGuard",
-      "status": "未移植；配置参数为不可直接读取的二进制封装，原 Guard 实现未公开"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；配置参数含不可直接读取的二进制封装，可能需要补充官网 / JSON 接口；未实现原 Guard 协议"
     },
     {
       "key": "荐片",
       "name": "🥝荐片┃多线",
       "api": "csp_JPJGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "奥特",
       "name": "🏝奥特┃多线",
       "api": "csp_AueteGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "本轮 HTTP 取址及系统播放已通过模拟器；搜索验证码手动完成"
     },
     {
       "key": "新6V",
       "name": "🧲新6V┃磁力",
       "api": "csp_SixVGuard",
-      "status": "未移植；磁力 / 下载协议与 iOS 系统播放器不直接兼容"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可读取公开网页，磁力 / 下载协议不能交给系统播放器，未保证出播放链接"
     },
     {
       "key": "AiDj",
       "name": "❤️AI剧┃弹幕",
       "api": "csp_AiDjGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "Dm84",
       "name": "🚌巴士┃动漫",
       "api": "csp_Dm84Guard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "本轮 HTTP 取址及系统播放已通过模拟器"
     },
     {
       "key": "看球",
       "name": "⚽八八┃看球",
       "api": "csp_KanqiuGuard",
-      "status": "未移植；直播节目与签名取流接口待逐站核实"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；直播节目和特殊签名取流不属于通用 HTML / JSON 规则，未保证出播放链接"
     },
     {
       "key": "多多",
       "name": "🏀多多┃回放",
       "api": "csp_DoubaoGuard",
-      "status": "未移植；直播节目与签名取流接口待逐站核实"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；直播节目和特殊签名取流不属于通用 HTML / JSON 规则，未保证出播放链接"
     },
     {
       "key": "吃瓜",
       "name": "🏐吃瓜┃看球",
       "api": "csp_LiveGzGuard",
-      "status": "未移植；直播节目与签名取流接口待逐站核实"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；直播节目和特殊签名取流不属于通用 HTML / JSON 规则，未保证出播放链接"
     },
     {
       "key": "alllive",
       "name": "🎮一直播┃直播",
       "api": "csp_AllliveGuard",
-      "status": "未移植；配置参数为不可直接读取的二进制封装，原 Guard 实现未公开"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；配置参数含不可直接读取的二进制封装，可能需要补充官网 / JSON 接口；未实现原 Guard 协议"
     },
     {
       "key": "MTV",
       "name": "🎶明星┃MV",
       "api": "csp_BiliGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "独立 Swift 适配；电脑端网络验证，iOS 播放未验证"
     },
     {
       "key": "有声小说",
       "name": "🎧有声┃小说",
       "api": "csp_YueTingGuard",
-      "status": "未移植；未取得可核实的原 Guard 规则或当前完整公开取址链路"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；统一奥特 / MacCMS / JSON 采集与 HTTP 媒体取址，缺地址或结构不匹配时可补充规则；未逐源保证可用"
     },
     {
       "key": "Aid",
       "name": "🚑急救┃教学",
       "api": "csp_FirstAidGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "新增独立 Swift 适配；公开目录与 MP4 网络验证，iOS 播放未验证"
     },
     {
       "key": "ZPan",
       "name": "🎈盘搜┃四盘",
       "api": "csp_S_zpsGuard",
-      "status": "未移植；网盘索引、登录会话与服务商取址链路尚未实现"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可尝试公开网页，网盘登录会话与服务商取址协议未实现，失败会显示实际原因"
     },
     {
       "key": "JPan",
       "name": "🦋易搜┃四盘",
       "api": "csp_S_zpsGuard",
-      "status": "未移植；网盘索引、登录会话与服务商取址链路尚未实现"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可尝试公开网页，网盘登录会话与服务商取址协议未实现，失败会显示实际原因"
     },
     {
       "key": "YpanSo",
       "name": "🐌盘她┃夸父",
       "api": "csp_YpanSoGuard",
-      "status": "未移植；网盘索引、登录会话与服务商取址链路尚未实现"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可尝试公开网页，网盘登录会话与服务商取址协议未实现，失败会显示实际原因"
     },
     {
       "key": "BpanSo",
       "name": "🐞盘他┃嘟嘟",
       "api": "csp_BpanSoGuard",
-      "status": "未移植；网盘索引、登录会话与服务商取址链路尚未实现"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可尝试公开网页，网盘登录会话与服务商取址协议未实现，失败会显示实际原因"
     },
     {
       "key": "抠搜",
       "name": "🌶️抠抠┃搜搜",
       "api": "csp_KkSsGuard",
-      "status": "未移植；网盘索引、登录会话与服务商取址链路尚未实现"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可尝试公开网页，网盘登录会话与服务商取址协议未实现，失败会显示实际原因"
     },
     {
       "key": "UC",
       "name": "🌈优汐┃搜搜",
       "api": "csp_UuSsGuard",
-      "status": "未移植；网盘索引、登录会话与服务商取址链路尚未实现"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；可尝试公开网页，网盘登录会话与服务商取址协议未实现，失败会显示实际原因"
     },
     {
       "key": "Bili",
       "name": "🅱哔哔合集┃弹幕",
       "api": "csp_BiliGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "独立 Swift 适配；电脑端网络验证，iOS 播放未验证"
     },
     {
       "key": "Biliych",
       "name": "🅱哔哔演唱会┃弹幕",
       "api": "csp_BiliGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "独立 Swift 适配；电脑端网络验证，iOS 播放未验证"
     },
     {
       "key": "少儿教育",
       "name": "📚少儿┃教育",
       "api": "csp_BiliGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "独立 Swift 适配；电脑端网络验证，iOS 播放未验证"
     },
     {
       "key": "小学课堂",
       "name": "📚小学┃课堂",
       "api": "csp_BiliGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "独立 Swift 适配；电脑端网络验证，iOS 播放未验证"
     },
     {
       "key": "初中课堂",
       "name": "📚初中┃课堂",
       "api": "csp_BiliGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "独立 Swift 适配；电脑端网络验证，iOS 播放未验证"
     },
     {
       "key": "高中教育",
       "name": "📚高中┃课堂",
       "api": "csp_BiliGuard",
+      "enabled": true,
+      "nativeAdapterImplemented": true,
+      "genericEnabled": false,
       "status": "独立 Swift 适配；电脑端网络验证，iOS 播放未验证"
     },
     {
       "key": "push_agent",
       "name": "🛴手机┃推送",
       "api": "csp_PushGuard",
-      "status": "未移植；推送 / 提示 / 片单功能不等同于普通影片播放源"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；推送 / 提示 / 片单不一定提供普通影片列表，可补充公开网址或规则后尝试"
     },
     {
       "key": "cc",
       "name": "请勿信视频中任何广告",
       "api": "csp_XPathGuard",
-      "status": "未移植；推送 / 提示 / 片单功能不等同于普通影片播放源"
+      "enabled": true,
+      "nativeAdapterImplemented": false,
+      "genericEnabled": true,
+      "status": "通用尝试已开放；推送 / 提示 / 片单不一定提供普通影片列表，可补充公开网址或规则后尝试"
     }
   ]
 }
