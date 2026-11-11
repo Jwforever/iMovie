@@ -13,6 +13,7 @@ final class DalvikVM {
     var traceEnabled = false
     private var statics: [String: DalvikValue] = [:]
     private var natives: [String: (DalvikVM, DalvikObject?, [DalvikValue]) throws -> DalvikValue] = [:]
+    private var overrides: [String: (DalvikVM, DalvikObject?, [DalvikValue]) throws -> DalvikValue] = [:]
     private var stackNames: [String] = []
     private var caught: DalvikValue = .ref(nil)
     private(set) var invocationParameters: [String] = []
@@ -33,6 +34,12 @@ final class DalvikVM {
         self.deadline = ProcessInfo.processInfo.systemUptime + timeout
         self.httpSession = httpSession
         DalvikNatives.install(self)
+        DalvikHTMLSupport.install(self)
+    }
+
+    func registerOverride(_ owner: String, _ name: String,
+                          _ body: @escaping (DalvikVM, DalvikObject?, [DalvikValue]) throws -> DalvikValue) {
+        overrides[owner + "->" + name] = body
     }
 
     func checkExecution() throws {
@@ -129,6 +136,7 @@ final class DalvikVM {
     @discardableResult
     func invoke(_ method: DalvikMethod, _ args: [DalvikValue], _ this: DalvikObject?) throws -> DalvikValue? {
         try checkExecution()
+        if let body = overrides[method.owner + "->" + method.name] { return try body(self, this, args) }
         if method.isStatic { try ensureInitialized(method.owner) }
         callCount += 1
         guard method.codeOffset > 0 else {
