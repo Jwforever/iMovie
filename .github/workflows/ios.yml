@@ -10,6 +10,10 @@ name: Build unsigned iOS app
         description: macOS runner
         type: string
         default: macos-15
+      source_keys:
+        description: Optional comma-separated plugin keys to diagnose
+        type: string
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -31,6 +35,8 @@ jobs:
           else
             bash scripts/build-unsigned.sh
           fi
+        env:
+          IMOVIE_SOURCE_DIAGNOSTICS_KEYS: ${{ inputs.source_keys }}
       - name: Unit test report
         if: always()
         run: git status --short

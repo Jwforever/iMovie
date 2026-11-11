@@ -9,7 +9,9 @@ final class LivePluginDiagnosticsTests: XCTestCase {
         let config = try await HTTPClient().config(at: url.absoluteString)
         let dex = try await SpiderPluginCache.shared.dex(spider: config.spider)
         let index = GuardRuleCatalog.decode(file: try DexFile(data: dex), source: config.spider ?? "")
-        let sites = config.sites.filter(\.isPlugin)
+        let requestedKeys = Set((ProcessInfo.processInfo.environment["IMOVIE_SOURCE_DIAGNOSTICS_KEYS"] ?? "")
+            .split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+        let sites = config.sites.filter { $0.isPlugin && (requestedKeys.isEmpty || requestedKeys.contains($0.key) || requestedKeys.contains($0.pluginClassName ?? "")) }
         var reports: [[String: Any]] = []
         let destination = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("dist/plugin-source-diagnostics.json")
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
