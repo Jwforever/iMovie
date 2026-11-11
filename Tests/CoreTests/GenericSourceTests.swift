@@ -3,11 +3,12 @@ import XCTest
 @testable import iMovieCore
 
 final class GenericSourceTests: XCTestCase {
-    func testAllPluginSourcesStayOpenAndSeparateInSearch() throws {
+    func testAllPluginSourcesStayOpenAndShareOneSearchTarget() throws {
         let config = try ConfigDecoder.decode(Data(#"{"sites":[{"key":"new-a","type":3,"api":"csp_NewUnknownGuard"},{"key":"new-b","type":3,"api":"csp_NewUnknownGuard"}]}"#.utf8), sourceURL: URL(string: "https://example.test/config")!)
         XCTAssertEqual(config.nativeSites.count, 2)
         XCTAssertTrue(config.sites.allSatisfy(\.isPlugin))
-        XCTAssertEqual(config.searchTargets.count, 2)
+        XCTAssertEqual(config.searchTargets.count, 1)
+        XCTAssertEqual(config.searchTargets[0].aliases.count, 1)
         XCTAssertEqual(config.sites[0].runtime.title, "本机插件解析")
     }
 
