@@ -80,7 +80,6 @@ import SwiftUI
             .searchable(text: $filter, prompt: "查找点播来源")
             .navigationTitle("选择点播源").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
-            .task { await probeUntested() }
         }
     }
 
@@ -184,6 +183,7 @@ import SwiftUI
     @State private var requestToken = UUID()
     @State private var verifyingSource = false
     @State private var verifyURL: URL?
+    @State private var loadTask: Task<Void, Never>?
     private let client = TVAPIClient()
     private var isHome: Bool { category.isEmpty && activeSearch.isEmpty }
 
@@ -218,7 +218,7 @@ import SwiftUI
                                 Button("在网页中验证后重试") { openVerification() }
                                     .buttonStyle(.borderedProminent).accessibilityIdentifier("source-verify")
                             }
-                            Button("重试") { Task { await load(reset: true) } }.buttonStyle(.bordered)
+                            Button("重试") { startLoad(reset: true) }.buttonStyle(.bordered)
                         }
                         if !loading && error == nil && videos.isEmpty {
                             EmptyPanel(icon: "magnifyingglass", title: "暂无内容", message: "试试切换分类或更换关键词。")
@@ -233,7 +233,7 @@ import SwiftUI
                         }
                         if loading { ProgressView().frame(maxWidth: .infinity).padding(25) }
                         if !loading && page < pageCount {
-                            Button("加载更多") { Task { await load(reset: false) } }
+                            Button("加载更多") { startLoad(reset: false) }
                                 .buttonStyle(.bordered).frame(maxWidth: .infinity)
                         }
                       } header: {
@@ -263,8 +263,9 @@ import SwiftUI
         }
         .background(Theme.backdrop)
         .navigationTitle(embedded ? "" : Theme.sourceName(site.name)).navigationBarTitleDisplayMode(.inline)
-        .task { if site.isNative && videos.isEmpty { await load(reset: true) } }
-        .sheet(isPresented: $verifyingSource, onDismiss: { Task { await load(reset: true) } }) {
+        .task { if site.isNative && videos.isEmpty { startLoad(reset: true) } }
+        .onDisappear { loadTask?.cancel() }
+        .sheet(isPresented: $verifyingSource, onDismiss: { startLoad(reset: true) }) {
             if let verifyURL { SourceVerificationView(url: verifyURL) }
         }
     }
@@ -286,7 +287,7 @@ import SwiftUI
             category = id
             activeSearch = ""
             search = ""
-            Task { await load(reset: true) }
+            startLoad(reset: true)
         } label: {
             VStack(spacing: 8) {
                 Text(title).font(.system(size: 16, weight: category == id ? .bold : .medium))
@@ -329,7 +330,12 @@ import SwiftUI
     private func submitSearch() {
         activeSearch = search.trimmingCharacters(in: .whitespacesAndNewlines)
         category = ""
-        Task { await load(reset: true) }
+        startLoad(reset: true)
+    }
+
+    private func startLoad(reset: Bool) {
+        loadTask?.cancel()
+        loadTask = Task { await load(reset: reset) }
     }
 
     @MainActor private func load(reset: Bool) async {

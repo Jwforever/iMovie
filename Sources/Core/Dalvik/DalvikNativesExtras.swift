@@ -82,6 +82,9 @@ extension DalvikNatives {
         vm.register("Lorg/json/JSONObject;", "toString") { _, this, _ in
             .ref(DalvikObject.string(encode(map(this))))
         }
+        for (name, original) in [("getJSONObject", "optJSONObject"), ("getJSONArray", "optJSONArray"), ("getInt", "optInt"), ("getBoolean", "optBoolean")] {
+            if let body = vm.nativeBody("Lorg/json/JSONObject;", original) { vm.register("Lorg/json/JSONObject;", name, body) }
+        }
 
         vm.register("Lorg/json/JSONArray;", "<init>") { _, this, args in
             var items: [DalvikValue] = []
@@ -244,6 +247,7 @@ extension DalvikNatives {
 
     static func network(_ vm: DalvikVM) {
         vm.register("Lokhttp3/OkHttpClient;", "<init>") { _, _, _ in .ref(nil) }
+        vm.register("Lokhttp3/OkHttpClient;", "newBuilder") { _, _, _ in .ref(DalvikObject(className: "Lokhttp3/OkHttpClient$Builder;")) }
         vm.register("Lokhttp3/OkHttpClient;", "newCall") { _, _, args in
             let call = DalvikObject(className: "Lokhttp3/Call;")
             call.payload = args.first?.asObject?.payload
@@ -251,7 +255,7 @@ extension DalvikNatives {
         }
         for name in ["connectTimeout", "readTimeout", "writeTimeout", "followRedirects",
                      "followSslRedirects", "retryOnConnectionFailure", "sslSocketFactory",
-                     "addInterceptor", "cookieJar", "hostnameVerifier", "proxy"] {
+                     "addInterceptor", "cookieJar", "hostnameVerifier", "proxy", "dns", "connectionSpecs", "cache"] {
             vm.register("Lokhttp3/OkHttpClient$Builder;", name) { _, this, _ in .ref(this) }
         }
         vm.register("Lokhttp3/OkHttpClient$Builder;", "<init>") { _, _, _ in .ref(nil) }
@@ -470,10 +474,12 @@ extension DalvikNatives {
             .ref(DalvikObject.string(NSTemporaryDirectory()))
         }
         vm.register("Landroid/text/TextUtils;", "isEmpty") { _, _, args in
-            .int(text(args.first).isEmpty ? 1 : 0)
+            .int(args.first?.isZero != false || text(args.first).isEmpty ? 1 : 0)
         }
         vm.register("Lcom/github/catvod/crawler/SpiderDebug;", "log") { _, _, _ in .ref(nil) }
         vm.register("Lcom/github/catvod/crawler/Spider;", "<init>") { _, _, _ in .ref(nil) }
+        vm.register("Lcom/github/catvod/crawler/Spider;", "client") { _, _, _ in .ref(DalvikObject(className: "Lokhttp3/OkHttpClient;")) }
+        vm.register("Lcom/github/catvod/crawler/Spider;", "safeDns") { _, _, _ in .ref(DalvikObject(className: "Lokhttp3/Dns;")) }
         vm.register("Lcom/github/catvod/crawler/Spider;", "init") { vm, this, args in
             if args.count == 2, let this, let method = vm.findMethod(this.className, "init", ["Landroid/content/Context;"]) {
                 _ = try vm.invoke(method, [args[0]], this)

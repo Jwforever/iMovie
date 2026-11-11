@@ -64,6 +64,7 @@ extension DalvikNatives {
         vm.register("Lcom/google/gson/Gson;", "fromJson") { _, _, args in
             let value: Any
             if let string = args.first?.asObject?.stringPayload {
+                if string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .ref(nil) }
                 value = try JSONSerialization.jsonObject(with: Data(string.utf8), options: [.fragmentsAllowed])
             } else { value = raw(args.first ?? .ref(nil)) }
             let target = args.count > 1 ? args[1].asObject : nil

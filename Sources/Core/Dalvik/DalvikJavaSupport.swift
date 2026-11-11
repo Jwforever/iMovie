@@ -18,6 +18,25 @@ extension DalvikNatives {
                 return .ref(nil)
             }
         }
+        vm.register("Ljava/lang/ThreadLocal;", "<init>") { _, _, _ in .ref(nil) }
+        vm.register("Ljava/lang/ThreadLocal;", "get") { vm, this, _ in
+            if let value = this?.fields["threadValue"] { return value }
+            if let this, let initial = vm.findMethod(this.className, "initialValue", []) {
+                let value = try vm.invoke(initial, [], this) ?? .ref(nil); this.fields["threadValue"] = value; return value
+            }
+            return .ref(nil)
+        }
+        vm.register("Ljava/lang/ThreadLocal;", "set") { _, this, args in this?.fields["threadValue"] = args.first; return .ref(nil) }
+        vm.register("Ljava/lang/ThreadLocal;", "remove") { _, this, _ in this?.fields.removeValue(forKey: "threadValue"); return .ref(nil) }
+        vm.register("Ljava/net/URL;", "<init>") { _, this, args in this?.payload = text(args.last); return .ref(nil) }
+        for name in ["getHost", "getProtocol", "getPath", "getPort", "toString", "toExternalForm"] {
+            vm.register("Ljava/net/URL;", name) { _, this, _ in
+                let value = this?.stringPayload ?? "", url = URL(string: this?.stringPayload ?? "")
+                if name == "getPort" { return .int(Int32(url?.port ?? -1)) }
+                let result = name == "getHost" ? url?.host ?? "" : name == "getProtocol" ? url?.scheme ?? "" : name == "getPath" ? url?.path ?? "" : value
+                return .ref(DalvikObject.string(result))
+            }
+        }
         vm.register("Ljava/util/UUID;", "randomUUID") { _, _, _ in
             let object = DalvikObject(className: "Ljava/util/UUID;"); object.payload = UUID().uuidString.lowercased(); return .ref(object)
         }

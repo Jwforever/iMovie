@@ -180,6 +180,16 @@ final class DalvikVM {
             if let this, let found = findMethod(this.className, name, params) {
                 return found
             }
+            // 宿主对象也要按实际类型派发；混淆 switch 把 String 当 Object 调用 hashCode。
+            var current = this?.className
+            var seen = Set<String>()
+            while let type = current, seen.insert(type).inserted {
+                if nativeBody(type, name) != nil {
+                    return DalvikMethod(owner: type, name: name, params: params,
+                                        ret: "Ljava/lang/Object;", access: 0, codeOffset: 0)
+                }
+                current = classInfo(type)?.superName
+            }
         }
         if let found = findMethod(owner, name, params) { return found }
         let allowed = ["Ljava/", "Ljavax/", "Landroid/", "Lokhttp3/", "Lorg/json/",
@@ -566,7 +576,7 @@ final class DalvikVM {
                         break
                     }
                 }
-                guard let handler else { throw DalvikError.java(thrown.object.stringPayload ?? thrown.object.className) }
+                guard let handler else { throw thrown }
                 caught = .ref(thrown.object)
                 next = handler
             }
@@ -681,6 +691,7 @@ final class DalvikVM {
     }
 }
 
-struct DalvikThrown: Error {
+struct DalvikThrown: LocalizedError {
     let object: DalvikObject
+    var errorDescription: String? { "插件异常：\(object.className) \(object.stringPayload ?? "")" }
 }

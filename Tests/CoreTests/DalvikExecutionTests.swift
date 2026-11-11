@@ -209,6 +209,15 @@ final class DalvikExecutionTests: XCTestCase {
         XCTAssertFalse(result.requests.isEmpty, "必须通过插件的 HTTP 垫片读取 HTML")
         XCTAssertGreaterThan(result.steps, 100)
     }
+
+    func testObjectHashCodeDispatchesToJavaStringForObfuscatedSwitch() throws {
+        let (vm, method) = try machine([0x106E, 0, 0x0001, 0x000A, 0x000F], registers: 2,
+            params: ["Ljava/lang/Object;"], references: [.init(owner: "Ljava/lang/Object;", name: "hashCode", params: [])])
+        let input = "\u{06E2}\u{06DF}\u{06E7}"
+        let expected = input.utf16.reduce(Int32(0)) { ($0 &* 31) &+ Int32($1) }
+        XCTAssertEqual(try vm.invoke(method, [.ref(DalvikObject.string(input))], nil)?.intValue, expected)
+        XCTAssertEqual(try vm.invoke(method, [.ref(DalvikObject.string(input))], nil)?.intValue, expected)
+    }
 }
 
 private final class DalvikHTTPFixture: URLProtocol {
