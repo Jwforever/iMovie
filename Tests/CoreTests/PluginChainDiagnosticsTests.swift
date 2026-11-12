@@ -25,6 +25,8 @@ final class PluginChainDiagnosticsTests: XCTestCase {
             .filter { !$0.isEmpty })
 
         let config = try await HTTPClient().config(at: "http://www.饭太硬.cc/tv")
+        // 采集器执行时要靠这个拿到插件包地址；应用里由 AppStore 在导入时写入。
+        SpiderSource.shared.update(config.spider)
         let selected = config.sites.filter { $0.isPlugin && keys.contains($0.key) }
         XCTAssertFalse(selected.isEmpty, "没有匹配到要测的来源")
 
