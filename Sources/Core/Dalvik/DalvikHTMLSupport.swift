@@ -258,7 +258,7 @@ enum DalvikHTMLSupport {
         }
         vm.registerOverride(attrName, "size") { _, this, _ in
             guard let node = this?.payload as? Node else { return .int(0) }
-            return .int(Int32(node.attributes()?.size() ?? 0))
+            return .int(Int32(node.getAttributes()?.size() ?? 0))
         }
         vm.registerOverride(elementName, "tF") { _, this, _ in
             let object = DalvikObject(className: attrName)
