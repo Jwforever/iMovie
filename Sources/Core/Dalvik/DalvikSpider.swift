@@ -81,10 +81,46 @@ enum DalvikSpider {
         } onCancel: { control.cancel() }
     }
 
+    /// 解释器是递归实现，插件里深层的 DOM 引擎很容易把默认栈压爆
+    /// （CI 上表现为 `Exited with unexpected signal code 10`）。
+    /// 统一放到 16 MB 栈的专用线程里跑，只在这一层转换一次。
     static func execute(dex: Data, shortName: String, action: DalvikSpiderAction,
                         ext: String, control: DalvikExecutionControl = DalvikExecutionControl(),
                         httpSession: URLSession = .shared, maximumSteps: Int = 20_000_000,
                         timeout: TimeInterval = 45) throws -> DalvikRunResult {
+        if Thread.current.threadDictionary["imovie.dalvik.stack"] != nil {
+            return try runOnCurrentThread(dex: dex, shortName: shortName, action: action,
+                                          ext: ext, control: control, httpSession: httpSession,
+                                          maximumSteps: maximumSteps, timeout: timeout)
+        }
+        final class Box: @unchecked Sendable {
+            var result: Result<DalvikRunResult, Error>?
+        }
+        let box = Box()
+        let semaphore = DispatchSemaphore(value: 0)
+        let thread = Thread {
+            Thread.current.threadDictionary["imovie.dalvik.stack"] = true
+            box.result = Result {
+                try runOnCurrentThread(dex: dex, shortName: shortName, action: action,
+                                       ext: ext, control: control, httpSession: httpSession,
+                                       maximumSteps: maximumSteps, timeout: timeout)
+            }
+            semaphore.signal()
+        }
+        thread.stackSize = 16 * 1024 * 1024
+        thread.name = "imovie.dalvik"
+        thread.start()
+        semaphore.wait()
+        guard let result = box.result else {
+            throw DalvikError.runtime("解释器线程没有返回结果")
+        }
+        return try result.get()
+    }
+
+    private static func runOnCurrentThread(dex: Data, shortName: String, action: DalvikSpiderAction,
+                                           ext: String, control: DalvikExecutionControl,
+                                           httpSession: URLSession, maximumSteps: Int,
+                                           timeout: TimeInterval) throws -> DalvikRunResult {
         try control.checkCancellation()
         let started = Date()
         let image = try DalvikImage(data: dex)

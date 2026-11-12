@@ -1,8 +1,10 @@
-# iMovie 0.5.4 · iOS 私人播放器
+# iMovie 0.5.5 · iOS 私人播放器
+
+0.5.5 修复插件解释执行的引用判断、字节码操作数、OkHttp 请求传递、异常处理偏移及插件缓存更新。当前正式链路为：配置指定的 spider 插件 → 本机解释执行采集器 → 失败时使用同插件提取的网页规则 → AVPlayer。详见 [本次修复与验证](docs/hotfix-0.5.5.md)。
 
 原生 SwiftUI iPhone / iPad 应用，iOS 16 及以上。**0.5.0 起不再有任何站点域名硬编码**：应用打开配置时，从配置的 `spider` 字段下载插件包，在设备内静态解开 `jar → *.guard → 明文 classes.dex`，再从插件里读出每个采集器的域名、搜索模板与 CSS 选择器，交给统一采集引擎请求网页并由 AVPlayer 播放。站点换域名只需重新导入配置，不需要重编 IPA。
 
-使用时不需要 Android 手机、盒子或自建解析服务器；不执行 Dalvik 字节码、不加载 `.so`、不跑安卓模拟器。
+使用时不需要 Android 手机、盒子或自建解析服务器。Dalvik 字节码由 Swift 解释器执行；不使用 JIT、不加载 Android `.so`、不跑安卓系统。解释器及宿主垫片尚未覆盖全部 Android API，不能把类数量等同于可播放来源数量。
 
 ## 为什么 iOS 不能直接跑 TVBox / OK影视 的源
 
@@ -27,7 +29,7 @@ TVBox 配置里 `type=3` 的条目，`api` 写的是 `csp_XXXGuard` 这样的**�
 | JIT 生成并执行原生代码 | 第三方 App 没有通用 JIT 权限，动态生成的机器码不能执行 |
 | `dlopen` 加载 jar 内的 `.so` | 沙箱只允许加载已签名、随包分发的动态库；`ftyshinidie.guard` 里的 `ftyguard_v7/v8.so` 即便解出来也加载不了 |
 
-结论很直接：**「在 iPhone 上执行 OK影视 的爬虫」纯客户端做不到**。能跑通的方案只剩一种——把 jar 放到服务器上执行，客户端只取结果。那意味着自建服务、要维护、要扛流量，且一旦服务停掉 App 就废。
+iOS 没有系统 ART，但可以用 Swift 解释器逐条执行 DEX，并为 Java / Android 外部调用提供宿主垫片。0.5.4 起正式采集优先走这条链路，静态规则提取作为失败后的回退；二者都在设备内完成。
 
 ### 现有 iOS 客户端为什么不解决这个问题
 
@@ -136,7 +138,7 @@ GenericSourceAdapter        SwiftSoup 采集列表、详情、选集 → MediaRe
 
 ## 安装与第一次使用
 
-1. 用你自己的签名工具重签 `dist/iMovie-0.5.4-unsigned.ipa`，装到 iPhone / iPad。
+1. 用你自己的签名工具重签 `dist/iMovie-0.5.5-unsigned.ipa`，装到 iPhone / iPad。
 2. 「设置」已默认填入 `http://www.饭太硬.cc/tv`，点「导入 / 更新配置」。导入后会在后台预热插件解析。
 3. 「首页」左上角选择点播源；首次打开某个源时才按需解规则，之后走本机缓存。
 4. 详情页选集后上方直接播放，不加载原播放网页。
@@ -154,8 +156,8 @@ bash scripts/build-unsigned.sh
 脚本先跑 `swift test`（含插件包回归测试），再生成工程、编译 arm64 Release、检查 Mach-O 与平台后打包：
 
 ```text
-dist/iMovie-0.5.4-unsigned.ipa
-dist/iMovie-0.5.4-unsigned.ipa.sha256
+dist/iMovie-0.5.5-unsigned.ipa
+dist/iMovie-0.5.5-unsigned.ipa.sha256
 ```
 
 Windows 无法编译 iOS 应用；本仓库通过 `.github/workflows/ios.yml` 在 macOS runner 上构建，Actions 产物 `iMovie-unsigned-ipa` 即签名前 IPA。

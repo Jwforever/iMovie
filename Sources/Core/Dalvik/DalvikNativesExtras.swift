@@ -256,7 +256,26 @@ extension DalvikNatives {
         vm.register("Lokhttp3/OkHttpClient;", "newBuilder") { _, _, _ in .ref(DalvikObject(className: "Lokhttp3/OkHttpClient$Builder;")) }
         vm.register("Lokhttp3/OkHttpClient;", "newCall") { _, _, args in
             let call = DalvikObject(className: "Lokhttp3/Call;")
-            call.payload = args.first?.asObject?.payload
+            let request = args.first?.asObject
+            if let box = request?.payload as? RequestBox {
+                call.payload = box
+            } else if let request {
+                // 少数插件不走 Request.Builder，直接从字段里取地址。
+                var url = ""
+                var method = "GET"
+                var headers: [String: String] = [:]
+                for (key, value) in request.fields {
+                    let name = key.split(separator: "|").last.map(String.init) ?? key
+                    switch name {
+                    case "url", "Url", "URL": url = text(value)
+                    case "method": method = text(value)
+                    case "headers", "header": if let map = value.asObject?.payload as? [String: String] { headers = map }
+                    default: break
+                    }
+                }
+                call.payload = RequestBox(url: url, headers: headers, method: method,
+                                          body: request.fields.values.compactMap { $0.asObject?.payload as? Data }.first)
+            }
             return .ref(call)
         }
         for name in ["connectTimeout", "readTimeout", "writeTimeout", "followRedirects",
@@ -398,8 +417,16 @@ extension DalvikNatives {
     /// 同步 HTTP。插件代码本身就是同步调用，这里用信号量等结果。
     static func perform(_ vm: DalvikVM, _ request: RequestBox?) throws -> HTTPResult {
         try vm.checkExecution()
-        guard let request, let url = URL(string: request.url), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else {
-            let address = request?.url ?? "(null)"
+        let raw = (request?.url ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        var target = URL(string: raw)
+        if target?.host == nil, let base = vm.baseURL,
+           let resolved = URL(string: raw, relativeTo: base)?.absoluteURL {
+            // 插件里常见 `site + "?filter=true"` 只拼了查询串，这里按上一次的主机补全。
+            target = resolved
+        }
+        guard let request, let url = target,
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else {
+            let address = raw.isEmpty ? "(null)" : raw
             vm.log(address, 0)
             throw DalvikError.runtime("插件生成的请求地址无效：" + String(address.prefix(200)))
         }

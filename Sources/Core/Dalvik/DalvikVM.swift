@@ -24,6 +24,8 @@ final class DalvikVM {
 
     /// 服务端请求记录，方便排查"为什么没内容"。
     private(set) var httpLog: [(url: String, code: Int)] = []
+    /// 最近一次成功请求的地址；插件拼出 `?filter=true` 这类相对地址时用它补全。
+    var baseURL: URL?
 
     init(image: DalvikImage, control: DalvikExecutionControl = DalvikExecutionControl(),
          maximumSteps: Int = 20_000_000, timeout: TimeInterval = 45,
