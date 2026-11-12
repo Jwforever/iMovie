@@ -57,6 +57,7 @@ final class PluginChainDiagnosticsTests: XCTestCase {
                 stages.append(Stage(name: "detail", ok: !lines.isEmpty,
                                     detail: "《\(video?.title ?? "?")》线路 \(lines.count) / 集数 \(lines.map(\.episodes.count).reduce(0, +)) / 输出 \(detailRun.json.count) 字节"))
                 report["detailRaw"] = String(detailRun.json.prefix(400))
+                report["detailRequests"] = detailRun.requests.map { ["url": $0.url, "code": $0.code] }
                 guard let line = lines.first, let episode = line.episodes.first else {
                     throw ViewerError.message("详情里没有选集")
                 }
@@ -70,6 +71,7 @@ final class PluginChainDiagnosticsTests: XCTestCase {
                 stages.append(Stage(name: "player", ok: playback?.url.hasPrefix("http") == true,
                                     detail: "字段 \(CatVodPayload.keys(in: playRun.json).joined(separator: ",")) / \(playback?.url.prefix(110) ?? playRun.json.prefix(120))"))
                 report["playRaw"] = String(playRun.json.prefix(400))
+                report["playRequests"] = playRun.requests.map { ["url": $0.url, "code": $0.code] }
             } catch {
                 stages.append(Stage(name: "error", ok: false, detail: error.localizedDescription))
                 report["error"] = error.localizedDescription
