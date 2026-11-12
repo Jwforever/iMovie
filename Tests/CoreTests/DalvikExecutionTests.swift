@@ -197,6 +197,9 @@ final class DalvikExecutionTests: XCTestCase {
         _ = try add(vm, builder, [.ref(DalvikObject.string("type")), .ref(DalvikObject.string("music"))])
         let buildForm = try XCTUnwrap(vm.nativeBody("Lokhttp3/FormBody$Builder;", "build"))
         let body = try XCTUnwrap(buildForm(vm, builder, []).asObject)
+        let formData = try XCTUnwrap(body.payload as? Data)
+        XCTAssertEqual(String(data: formData, encoding: .utf8), "id=abc&type=music")
+        XCTAssertEqual(DalvikNatives.contentType(of: body), "application/x-www-form-urlencoded")
 
         let requestBuilder = DalvikObject(className: "Lokhttp3/Request$Builder;")
         let initRequest = try XCTUnwrap(vm.nativeBody("Lokhttp3/Request$Builder;", "<init>"))
@@ -215,8 +218,8 @@ final class DalvikExecutionTests: XCTestCase {
         XCTAssertEqual(DalvikHTTPFixture.lastRequest?.httpMethod, "POST")
         XCTAssertEqual(DalvikHTTPFixture.lastRequest?.value(forHTTPHeaderField: "Content-Type"),
                        "application/x-www-form-urlencoded")
-        XCTAssertEqual(String(data: DalvikHTTPFixture.lastRequest?.httpBody ?? Data(), encoding: .utf8),
-                       "id=abc&type=music")
+        // URLSession 会把 POST 的 httpBody 转成 httpBodyStream，所以在协议层
+        // 只断言方法 / 头；正文用 RequestBox 与 httpTrace 校验。
         XCTAssertEqual(vm.httpTrace.first?.contentType, "application/x-www-form-urlencoded")
         XCTAssertEqual(vm.httpTrace.first?.bodyBytes, 17)
     }

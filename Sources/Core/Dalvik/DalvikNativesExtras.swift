@@ -513,7 +513,8 @@ extension DalvikNatives {
         let result = try box.get()
         vm.log(request.url, result.code, method: request.method,
                bodyBytes: request.body?.count ?? 0,
-               contentType: mutable.value(forHTTPHeaderField: "Content-Type") ?? "")
+               contentType: mutable.value(forHTTPHeaderField: "Content-Type") ?? "",
+               response: DalvikNatives.decode(Data(result.body.prefix(4096))))
         return result
     }
 

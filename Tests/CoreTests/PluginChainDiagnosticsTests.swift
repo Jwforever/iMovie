@@ -14,6 +14,14 @@ final class PluginChainDiagnosticsTests: XCTestCase {
         var detail: String
     }
 
+    /// 只用于挑选诊断样本：`暂无预告$www` 这类占位不是可播放的选集。
+    private static func looksLikePlayableID(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return false }
+        if trimmed.hasPrefix("{") || trimmed.contains("/") || trimmed.hasPrefix("http") { return true }
+        return trimmed.count >= 6
+    }
+
     func testWholeChainForSelectedSources() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard environment["IMOVIE_CHAIN_DIAGNOSTICS"] == "1" else {
@@ -36,33 +44,59 @@ final class PluginChainDiagnosticsTests: XCTestCase {
             var notes: [[String: String]] = []
 
             do {
-                // 1. 首页
-                let homeRun = try await DalvikSpider.run(spider: config.spider, api: site.api,
+                // 1. 首页。与 App 的 page() 一致：首页不带列表时退回第一个分类。
+                var homeRun = try await DalvikSpider.run(spider: config.spider, api: site.api,
                                                          action: .home, ext: site.extensionValue)
                 notes += homeRun.notes.map { ["stage": "home", "note": $0] }
                 let home = CatVodPayload.page(homeRun.json)
-                let videos = home?.videos ?? []
+                var videos = home?.videos ?? []
+                if videos.isEmpty, let category = home?.categories.first {
+                    let run = try await DalvikSpider.run(spider: config.spider, api: site.api,
+                                                         action: .category(id: category.id, page: "1"),
+                                                         ext: site.extensionValue)
+                    notes += run.notes.map { ["stage": "home", "note": $0] }
+                    if let page = CatVodPayload.page(run.json), !page.videos.isEmpty {
+                        videos = page.videos
+                        homeRun = run
+                    }
+                }
                 stages.append(Stage(name: "home", ok: !videos.isEmpty,
                                     detail: "分类 \(home?.categories.count ?? 0) / 影片 \(videos.count) / 输出 \(homeRun.json.count) 字节"))
                 report["homeRaw"] = String(homeRun.json.prefix(400))
-                guard let first = videos.first else { throw ViewerError.message("首页没有影片") }
+                guard !videos.isEmpty else { throw ViewerError.message("首页没有影片") }
 
-                // 2. 详情
-                let detailRun = try await DalvikSpider.run(spider: config.spider, api: site.api,
-                                                           action: .detail(id: first.id),
-                                                           ext: site.extensionValue)
-                notes += detailRun.notes.map { ["stage": "detail", "note": $0] }
-                let video = CatVodPayload.detail(detailRun.json)
-                let lines = video?.lines ?? []
+                // 2. 详情。有的条目只是"暂无预告"占位，换下一个真正带选集的条目。
+                var detailRun: DalvikRunResult?
+                var video: Video?
+                var line: EpisodeLine?
+                var episode: Episode?
+                var detailCandidates: [[String: Any]] = []
+                for candidate in videos.prefix(4) {
+                    let run = try await DalvikSpider.run(spider: config.spider, api: site.api,
+                                                         action: .detail(id: candidate.id),
+                                                         ext: site.extensionValue)
+                    notes += run.notes.map { ["stage": "detail", "note": $0] }
+                    let parsed = CatVodPayload.detail(run.json)
+                    let parsedLine = parsed?.lines.first
+                    let parsedEpisode = parsedLine?.episodes.first
+                    detailCandidates.append(["id": candidate.id, "title": parsed?.title ?? "",
+                                             "episode": parsedEpisode?.value ?? ""] as [String: Any])
+                    if detailRun == nil { detailRun = run }
+                    guard let value = parsedEpisode?.value, Self.looksLikePlayableID(value) else { continue }
+                    detailRun = run; video = parsed; line = parsedLine; episode = parsedEpisode
+                    break
+                }
+                report["detailCandidates"] = detailCandidates
+                guard let detailRun, let video, let line, let episode else {
+                    throw ViewerError.message("前几条详情都没有真实选集")
+                }
+                let lines = video.lines
                 stages.append(Stage(name: "detail", ok: !lines.isEmpty,
-                                    detail: "《\(video?.title ?? "?")》线路 \(lines.count) / 集数 \(lines.map(\.episodes.count).reduce(0, +)) / 输出 \(detailRun.json.count) 字节"))
+                                    detail: "《\(video.title)》线路 \(lines.count) / 集数 \(lines.map(\.episodes.count).reduce(0, +)) / 输出 \(detailRun.json.count) 字节"))
                 report["detailRaw"] = String(detailRun.json.prefix(400))
                 report["detailRequests"] = detailRun.requestTrace.map {
                     ["url": $0.url, "code": $0.code, "method": $0.method,
-                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType] as [String: Any]
-                }
-                guard let line = lines.first, let episode = line.episodes.first else {
-                    throw ViewerError.message("详情里没有选集")
+                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "response": $0.response] as [String: Any]
                 }
 
                 // 3. 播放。CatVod 有两种传法：只给 `$` 后面的值，或整条 `名称$值`。
@@ -84,7 +118,7 @@ final class PluginChainDiagnosticsTests: XCTestCase {
                         "json": String(run.json.prefix(400)),
                         "requests": run.requestTrace.map {
                             ["url": $0.url, "code": $0.code, "method": $0.method,
-                             "bodyBytes": $0.bodyBytes, "contentType": $0.contentType] as [String: Any]
+                             "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "response": $0.response] as [String: Any]
                         }
                     ] as [String: Any])
                     notes += run.notes.map { ["stage": "player", "note": $0] }
@@ -102,7 +136,7 @@ final class PluginChainDiagnosticsTests: XCTestCase {
                 report["playRaw"] = String(playRun.json.prefix(400))
                 report["playRequests"] = playRun.requestTrace.map {
                     ["url": $0.url, "code": $0.code, "method": $0.method,
-                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType] as [String: Any]
+                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "response": $0.response] as [String: Any]
                 }
             } catch {
                 stages.append(Stage(name: "error", ok: false, detail: error.localizedDescription))
