@@ -147,7 +147,8 @@ struct DalvikSourceAdapter {
                                                 action: .player(flag: flag, id: episode.value),
                                                 ext: site.extensionValue)
         guard let playback = CatVodPayload.playback(result.json) else {
-            throw ViewerError.message("\(site.name)：插件没有解出播放地址。")
+            // 把插件原样返回带出来，便于判断是字段名不同还是它本来就返回空。
+            throw ViewerError.message("\(site.name)：插件没有解出播放地址。" + String(result.json.prefix(240)))
         }
         return MediaLink(title: title, url: playback.url, headers: playback.headers,
                          group: site.name, kind: playback.needsParsing ? .web : .direct)
