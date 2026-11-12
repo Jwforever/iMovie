@@ -77,10 +77,21 @@ enum CatVodPayload {
                      playFrom: playFrom, playURL: playURL)
     }
 
+    static func keys(in raw: String) -> [String] {
+        dictionary(raw).map { $0.keys.sorted() } ?? []
+    }
+
     /// 播放：`parse != 0` 表示给的是网页，需要再解析。
     static func playback(_ raw: String) -> (url: String, headers: [String: String], needsParsing: Bool)? {
         guard let root = dictionary(raw) else { return nil }
-        let url = text(root["url"])
+        // 不同插件对播放地址的键名不一致，按常见顺序找。
+        var url = ""
+        for key in ["url", "playUrl", "play_url", "vurl", "m3u8", "data", "src"] {
+            if let value = root[key] as? String, !value.isEmpty { url = value; break }
+            if let nested = root[key] as? [String: Any], let value = nested["url"] as? String, !value.isEmpty {
+                url = value; break
+            }
+        }
         guard !url.isEmpty else { return nil }
         var headers: [String: String] = [:]
         if let map = root["header"] as? [String: String] {
@@ -147,8 +158,8 @@ struct DalvikSourceAdapter {
                                                 action: .player(flag: flag, id: episode.value),
                                                 ext: site.extensionValue)
         guard let playback = CatVodPayload.playback(result.json) else {
-            // 把插件原样返回带出来，便于判断是字段名不同还是它本来就返回空。
-            throw ViewerError.message("\(site.name)：插件没有解出播放地址。" + String(result.json.prefix(240)))
+            let keys = CatVodPayload.keys(in: result.json).joined(separator: ",")
+            throw ViewerError.message("\(site.name)：插件没有解出播放地址（返回字段：\(keys.isEmpty ? "空" : keys)）")
         }
         return MediaLink(title: title, url: playback.url, headers: playback.headers,
                          group: site.name, kind: playback.needsParsing ? .web : .direct)
