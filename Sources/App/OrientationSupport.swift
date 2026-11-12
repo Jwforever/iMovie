@@ -48,6 +48,22 @@ final class PlaybackOrientation: ObservableObject {
         apply(isLandscape ? .portrait : .landscapeRight)
     }
 
+    /// 详情页播放器：点全屏按钮进横屏。
+    func enterFullscreen() {
+        OrientationPolicy.mask = .allButUpsideDown
+        apply(.landscapeRight)
+    }
+
+    /// 返回竖屏并收回方向权限。
+    func exitFullscreen() {
+        OrientationPolicy.mask = .portrait
+        apply(.portrait)
+    }
+
+    func toggleFullscreen() {
+        if isLandscape { exitFullscreen() } else { enterFullscreen() }
+    }
+
     /// 连续几次同向才切换，避免手抖来回横竖。
     private func vote(_ landscape: Bool) {
         if lastVote == landscape { votes += 1 } else { lastVote = landscape; votes = 0 }

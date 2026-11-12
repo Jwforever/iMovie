@@ -178,6 +178,9 @@ final class PlaybackController: ObservableObject {
 @MainActor struct PlaybackSurface: View {
     @ObservedObject var controller: PlaybackController
     var fills = false
+    /// 传入后在控制条里显示全屏按钮（详情页播放器用）。
+    var onFullscreen: (() -> Void)? = nil
+    var isFullscreen = false
     @State private var showControls = true
     @State private var seeking = false
     @State private var seekValue: Double = 0
@@ -254,6 +257,12 @@ final class PlaybackController: ObservableObject {
                         }
                     } label: {
                         Text(String(format: "%.2fx", controller.speed)).font(.caption.monospacedDigit())
+                    }
+                    if let onFullscreen {
+                        Button(action: onFullscreen) {
+                            Image(systemName: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                                .font(.title3)
+                        }
                     }
                 }
                 .padding(12)

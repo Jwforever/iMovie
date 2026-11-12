@@ -403,6 +403,7 @@ import SwiftUI
     @State private var error: String?
     @State private var verifyingDetail = false
     @State private var verifyURL: URL?
+    @StateObject private var orientation = PlaybackOrientation()
     private let client = TVAPIClient()
 
     /// 详情字段缺失时（不少采集器只回选集），回退到列表页已知信息，
@@ -425,7 +426,9 @@ import SwiftUI
                     // 选集后播放器以固定 16:9 尺寸替换详情区，不随简介长度伸缩。
                     if let selection {
                         VStack(alignment: .leading, spacing: 12) {
-                            PlaybackSurface(controller: playback)
+                            PlaybackSurface(controller: playback,
+                                            onFullscreen: { orientation.toggleFullscreen() },
+                                            isFullscreen: orientation.isLandscape)
                             HStack {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text("\(shownVideo.title) · \(selection.title)").font(.headline)
@@ -511,6 +514,9 @@ import SwiftUI
         }
         .toolbar(selection == nil ? .visible : .hidden, for: .tabBar)
         .task { await fetchDetail() }
+        .onDisappear {
+            orientation.exitFullscreen()
+        }
         .sheet(isPresented: $verifyingDetail, onDismiss: { Task { await fetchDetail() } }) {
             if let verifyURL { SourceVerificationView(url: verifyURL) }
         }

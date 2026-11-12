@@ -102,8 +102,9 @@ final class MPVMetalViewController: UIViewController {
         let status = mpv_initialize(mpv)
         if status < 0 {
             let message = String(cString: mpv_error_string(status))
+            let tail = logTail()
             DispatchQueue.main.async { [weak self] in
-                self?.playback?.ended("mpv 初始化失败：\(message)（\(self.logTail())）")
+                self?.playback?.ended("mpv 初始化失败：\(message)（\(tail)）")
             }
             return
         }
