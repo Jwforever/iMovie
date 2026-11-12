@@ -81,6 +81,11 @@ final class AppStore: ObservableObject {
         sourceOrder = Self.load([String].self, key: "sourceOrder", defaults: storage) ?? []
         hideFailedSources = storage.object(forKey: "hideFailedSources") == nil ? true : storage.bool(forKey: "hideFailedSources")
         SpiderSource.shared.update(config?.spider)
+        // 覆盖安装等场景配置是存量加载的，启动就把全部来源探一遍，
+        // 让"只保留可用"尽快生效（12 小时内测成功的不重复测）。
+        if config != nil {
+            Task { await probeAllSources() }
+        }
     }
 
     /// 记录来源最近一次真实拉取的结果，用来把能出内容的源排到前面。
@@ -99,11 +104,16 @@ final class AppStore: ObservableObject {
     }
 
     /// 固定顺序下的来源列表，界面只读这个。
-    /// 打开"只保留可用"时，探测失败的源被隐藏（未测过的保留），默认源始终显示。
+    /// 打开"只保留可用"时：探测失败的、探测成功但首页拉空的源都被隐藏
+    /// （未测过的保留），默认源始终显示。
     var orderedSites: [SourceSite] {
         let sites = SourceOrdering.apply(order: sourceOrder, to: config?.sites ?? [])
         guard hideFailedSources else { return sites }
-        let usable = sites.filter { rank(of: $0) > 0 || $0.key == homeSourceKey }
+        let usable = sites.filter { site in
+            if site.key == homeSourceKey { return true }
+            guard let record = health[site.key] else { return true }
+            return record.rank > 0 && record.items > 0
+        }
         return usable.isEmpty ? sites : usable
     }
 

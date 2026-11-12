@@ -55,7 +55,7 @@ import SwiftUI
                         }
                     }
                 }.disabled(store.probingSources)
-                Text("导入配置后自动逐个试拉首页（插件源走设备内解释器），失败的源会被隐藏、能用的排前面。失败可能是站点临时故障，可手动重新检测。")
+                Text("启动和导入配置后自动逐个试拉首页（插件源走设备内解释器），失败的、拉不到内容的源会被隐藏，能用的排前面。失败可能是站点临时故障，可手动重新检测。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("播放器") {
