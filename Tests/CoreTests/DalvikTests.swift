@@ -73,6 +73,18 @@ final class DalvikTests: XCTestCase {
         XCTAssertEqual(eqOne.asObject?.items?.count, 1)
     }
 
+    /// 详情里缺片名时绝不能拿线路名（"自动"）冒充；界面层会用列表页已知信息兜底。
+    func testDetailKeepsEmptyNameInsteadOfLineName() throws {
+        let json = """
+        {"list":[{"vod_id":"1","vod_name":"","vod_play_from":"自动",
+                  "vod_play_url":"第1集$https://cdn.example/s1.m3u8"}]}
+        """
+        let video = try XCTUnwrap(CatVodPayload.detail(json))
+        XCTAssertTrue(video.title.isEmpty, "不能拿线路名冒充片名")
+        XCTAssertEqual(video.lines.first?.name, "自动")
+        XCTAssertEqual(video.lines.first?.episodes.first?.value, "https://cdn.example/s1.m3u8")
+    }
+
     func testImageReadsCollectorClasses() throws {
         let image = try DalvikImage(data: try innerDex())
         XCTAssertGreaterThan(image.classes.count, 800, "DEX 里的类没有解析出来")
