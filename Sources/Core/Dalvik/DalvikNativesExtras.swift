@@ -615,7 +615,7 @@ extension DalvikNatives {
         vm.register("Ljava/math/BigDecimal;", "divide") { _, this, args in
             let divisor = decimal(args.first)
             guard divisor != 0 else { return try fail("BigDecimal 除零") }
-            box(((this?.payload as? Decimal) ?? 0) / divisor)
+            return box(((this?.payload as? Decimal) ?? 0) / divisor)
         }
         vm.register("Ljava/math/BigDecimal;", "remainder") { _, this, args in
             let divisor = decimal(args.first)
@@ -626,14 +626,14 @@ extension DalvikNatives {
                                                   raiseOnDivideByZero: false)
             let quotient = dividend.dividing(by: NSDecimalNumber(decimal: divisor), withBehavior: behavior)
             let remainder = dividend.subtracting(quotient.multiplying(by: NSDecimalNumber(decimal: divisor)))
-            box(remainder.decimalValue)
+            return box(remainder.decimalValue)
         }
         vm.register("Ljava/math/BigDecimal;", "negate") { _, this, _ in
             box(-((this?.payload as? Decimal) ?? 0))
         }
         vm.register("Ljava/math/BigDecimal;", "abs") { _, this, _ in
             let value = (this?.payload as? Decimal) ?? 0
-            box(value < 0 ? -value : value)
+            return box(value < 0 ? -value : value)
         }
         vm.register("Ljava/math/BigDecimal;", "stripTrailingZeros") { _, this, _ in
             box((this?.payload as? Decimal) ?? 0)
