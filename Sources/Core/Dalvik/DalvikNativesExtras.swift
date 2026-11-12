@@ -613,9 +613,11 @@ extension DalvikNatives {
             box(((this?.payload as? Decimal) ?? 0) * decimal(args.first))
         }
         vm.register("Ljava/math/BigDecimal;", "divide") { _, this, args in
+            let value = (this?.payload as? Decimal) ?? 0
             let divisor = decimal(args.first)
-            guard divisor != 0 else { return try fail("BigDecimal 除零") }
-            return box(((this?.payload as? Decimal) ?? 0) / divisor)
+            // Java 这里会抛 ArithmeticException，但除数只出现在画质分级辅助计算里，
+            // 数据差异导致除零时抛异常会杀死整个播放解析，这里退回原值。
+            return box(divisor == 0 ? value : value / divisor)
         }
         vm.register("Ljava/math/BigDecimal;", "remainder") { _, this, args in
             let divisor = decimal(args.first)
