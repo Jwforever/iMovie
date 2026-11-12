@@ -17,6 +17,22 @@ final class PlaybackPipelineTests: XCTestCase {
         var detail: String
     }
 
+    /// 慢站点会把测试拖过整个任务超时，每个来源单独掐表。
+    private static func withTimeout<T: Sendable>(seconds: Double, _ operation: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw ViewerError.message("来源处理超时")
+            }
+            guard let first = try await group.next() else {
+                throw ViewerError.message("来源处理无结果")
+            }
+            group.cancelAll()
+            return first
+        }
+    }
+
     /// 与链路诊断一致的占位判定：`暂无预告$www` 不是可播放的选集。
     private static func looksLikePlayableID(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -49,12 +65,18 @@ final class PlaybackPipelineTests: XCTestCase {
             do {
                 var play: (title: String, url: URL, headers: [String: String])
                 do {
-                    play = try await Self.resolvePlayURL(site: site, spider: config.spider, ext: site.extensionValue)
+                    play = try await Self.withTimeout(seconds: 240) {
+                        try await Self.resolvePlayURL(site: site, spider: config.spider, ext: site.extensionValue)
+                    }
                 } catch {
                     // 站点抖动重试一次；仍失败记为来源不可用（警告级），不算管线硬失败。
-                    play = try await Self.resolvePlayURL(site: site, spider: config.spider, ext: site.extensionValue)
+                    play = try await Self.withTimeout(seconds: 240) {
+                        try await Self.resolvePlayURL(site: site, spider: config.spider, ext: site.extensionValue)
+                    }
                 }
-                let outcome = try await Self.fetchThroughProxy(play)
+                let outcome = try await Self.withTimeout(seconds: 150) {
+                    try await Self.fetchThroughProxy(play)
+                }
                 pipeline = Pipeline(key: site.key, title: play.title,
                                     originalURL: String(play.url.absoluteString.prefix(160)),
                                     ok: outcome.ok, detail: outcome.detail)
