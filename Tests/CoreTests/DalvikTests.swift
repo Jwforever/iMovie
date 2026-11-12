@@ -1,4 +1,5 @@
 import Foundation
+import SwiftSoup
 import XCTest
 @testable import iMovieCore
 
@@ -12,6 +13,64 @@ final class DalvikTests: XCTestCase {
             throw XCTSkip("缺少测试夹具 spider.jar")
         }
         return try GuardContainer.innerDex(from: Data(contentsOf: url))
+    }
+
+    /// DOM 垫片是解释器跑通插件详情/播放的关键。这里用真实插件镜像验证混淆名与
+    /// jsoup 语义一一对应；奥特等站点的播放地址就靠 lF(data) 从 script 里取。
+    func testHTMLShimsMatchPluginDOMSemantics() throws {
+        let image = try DalvikImage(data: try innerDex())
+        let vm = DalvikVM(image: image)
+        let hN = "Lcom/github/catvod/spider/merge/hN;"
+        let mA = "Lcom/github/catvod/spider/merge/MA;"
+        let kB = "Lcom/github/catvod/spider/merge/kB;"
+
+        let html = "<div id=\"wrap\"><script>var now=\"https://cdn.example/x.m3u8\";</script>" +
+            "<p class=\"t\">hello</p></div>"
+        let root = try XCTUnwrap(try SwiftSoup.parse(html).select("div").first())
+
+        func obj(_ element: Element) -> DalvikObject {
+            let object = DalvikObject(className: hN)
+            object.payload = element
+            return object
+        }
+        func body(_ owner: String, _ name: String) throws ->
+            (DalvikVM, DalvikObject?, [DalvikValue]) throws -> DalvikValue {
+            try XCTUnwrap(vm.overrideBody(owner, name), "缺垫片 \(owner)->\(name)")
+        }
+        func text(_ value: DalvikValue?) -> String {
+            DalvikNatives.text(value ?? .ref(nil))
+        }
+
+        // lF = data()：奥特 playerContent 靠它从 <script> 里拿播放地址。
+        let script = try XCTUnwrap(try root.select("script").first())
+        XCTAssertEqual(text(try body(hN, "lF")(vm, obj(script), [])), "var now=\"https://cdn.example/x.m3u8\"")
+
+        // cS = select，返回 kB 列表。
+        let selected = try body(hN, "cS")(vm, obj(root), [.ref(DalvikObject.string("p"))])
+        XCTAssertEqual(selected.asObject?.items?.count, 1)
+
+        // 结构导航：L=parent、J=children、C=siblingIndex、o/u7=前后兄弟。
+        let parent = try body(hN, "L")(vm, obj(script), [])
+        XCTAssertEqual(text(try body(mA, "N")(vm, parent.asObject, [.ref(DalvikObject.string("id"))])), "wrap")
+        let children = try body(hN, "J")(vm, obj(root), [])
+        XCTAssertEqual(children.asObject?.items?.count, 2)
+        let paragraph = try XCTUnwrap(children.asObject?.items?.last?.asObject)
+        XCTAssertEqual(try body(hN, "C")(vm, paragraph, []).intValue, 1)
+        let next = try body(hN, "o")(vm, children.asObject?.items?.first?.asObject, [])
+        XCTAssertEqual(text(try body(hN, "kR")(vm, next.asObject, [])), "hello")
+        let previous = try body(hN, "u7")(vm, paragraph, [])
+        XCTAssertEqual((previous.asObject?.payload as? Element)?.tagName(), "script")
+
+        // 文本与属性修改：Qz=text(String)、V=attr(k,v)。
+        try body(hN, "Qz")(vm, paragraph, [.ref(DalvikObject.string("替换后的文本"))])
+        XCTAssertEqual(try XCTUnwrap(paragraph.payload as? Element).text(), "替换后的文本")
+        try body(hN, "V")(vm, obj(script), [.ref(DalvikObject.string("src")), .ref(DalvikObject.string("a.js"))])
+        XCTAssertEqual(try script.attr("src"), "a.js")
+
+        // 列表：kB.tF 第一个、kB.N(i) 取第 i 个包成新列表、kB.t0 拼接文本。
+        XCTAssertEqual(text(try body(kB, "t0")(vm, children.asObject, [])), "替换后的文本")
+        let eqOne = try body(kB, "N")(vm, children.asObject, [.int(1)])
+        XCTAssertEqual(eqOne.asObject?.items?.count, 1)
     }
 
     func testImageReadsCollectorClasses() throws {

@@ -74,6 +74,12 @@ final class DalvikVM {
         natives[className + "->" + name]
     }
 
+    /// 测试用：读取 override 垫片（overrides 不走继承链，测试必须按声明 owner 精确取）。
+    func overrideBody(_ className: String, _ name: String)
+        -> ((DalvikVM, DalvikObject?, [DalvikValue]) throws -> DalvikValue)? {
+        overrides[className + "->" + name]
+    }
+
     func registerAlias(_ className: String, _ name: String,
                        _ body: @escaping (DalvikVM, DalvikObject?, [DalvikValue]) throws -> DalvikValue) {
         let key = className + "->" + name
