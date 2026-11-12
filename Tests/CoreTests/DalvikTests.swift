@@ -43,7 +43,7 @@ final class DalvikTests: XCTestCase {
 
         // lF = data()：奥特 playerContent 靠它从 <script> 里拿播放地址。
         let script = try XCTUnwrap(try root.select("script").first())
-        XCTAssertEqual(text(try body(hN, "lF")(vm, obj(script), [])), "var now=\"https://cdn.example/x.m3u8\"")
+        XCTAssertEqual(text(try body(hN, "lF")(vm, obj(script), [])), "var now=\"https://cdn.example/x.m3u8\";")
 
         // cS = select，返回 kB 列表。
         let selected = try body(hN, "cS")(vm, obj(root), [.ref(DalvikObject.string("p"))])
