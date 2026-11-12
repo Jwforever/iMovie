@@ -376,6 +376,19 @@ enum DalvikNatives {
     private static func numbers(_ vm: DalvikVM) {
         let wrappers = ["Ljava/lang/Integer;", "Ljava/lang/Long;", "Ljava/lang/Short;",
                         "Ljava/lang/Byte;", "Ljava/lang/Double;", "Ljava/lang/Float;"]
+        for className in ["Ljava/lang/Double;", "Ljava/lang/Float;"] {
+            vm.register(className, "isNaN") { _, _, args in
+                .int(args.first?.doubleValue.isNaN == true ? 1 : 0)
+            }
+            vm.register(className, "isInfinite") { _, _, args in
+                .int(args.first?.doubleValue.isInfinite == true ? 1 : 0)
+            }
+            vm.register(className, "compare") { _, _, args in
+                let left = args.first?.doubleValue ?? 0
+                let right = args.count > 1 ? args[1].doubleValue : 0
+                return .int(left < right ? -1 : (left > right ? 1 : 0))
+            }
+        }
         for className in wrappers {
             vm.register(className, "parseInt") { _, _, args in .int(Int32(truncatingIfNeeded: parseLong(text(args.first), radix: args.count > 1 ? Int(args[1].intValue) : 10))) }
             vm.register(className, "parseLong") { _, _, args in .long(parseLong(text(args.first), radix: args.count > 1 ? Int(args[1].intValue) : 10)) }
