@@ -71,9 +71,9 @@ final class PlaybackPipelineTests: XCTestCase {
     }
 
     /// 首页 → 详情 → 选集 → 播放地址（与链路诊断同一段逻辑的紧凑版）。
-    private static func resolvePlayURL(site: SourceSite, spider: String?, ext: String) async throws
+    private static func resolvePlayURL(site: SourceSite, spider: String?, ext: String?) async throws
         -> (title: String, url: URL, headers: [String: String]) {
-        var homeRun = try await DalvikSpider.run(spider: spider, api: site.api, action: .home, ext: ext)
+        let homeRun = try await DalvikSpider.run(spider: spider, api: site.api, action: .home, ext: ext)
         var videos = CatVodPayload.page(homeRun.json)?.videos ?? []
         if videos.isEmpty, let category = CatVodPayload.page(homeRun.json)?.categories.first {
             let run = try await DalvikSpider.run(spider: spider, api: site.api,
