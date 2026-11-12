@@ -34,10 +34,16 @@ extension DalvikNatives {
             return .ref(DalvikObject.string(formatter.string(from: date)))
         }
 
+        /// 插件面向国内站点，安卓设备默认东八区；解释器在任意环境跑都必须对齐，
+        /// 否则时间戳签名（如易听的 key=yyyyMMddHHmm...）与服务端校验差 8 小时。
+        func pluginTimeZone() -> TimeZone {
+            TimeZone(identifier: "Asia/Shanghai") ?? TimeZone.current
+        }
+
         func formatter(_ pattern: String) -> DateFormatter {
             let output = DateFormatter()
             output.locale = Locale(identifier: "en_US_POSIX")
-            output.timeZone = TimeZone.current
+            output.timeZone = pluginTimeZone()
             output.dateFormat = pattern.isEmpty ? "yyyy-MM-dd HH:mm:ss" : pattern
             return output
         }
@@ -78,7 +84,7 @@ extension DalvikNatives {
             .ref(DalvikObject(className: "Ljava/util/TimeZone;"))
         }
         vm.register("Ljava/util/TimeZone;", "getID") { _, _, _ in
-            .ref(DalvikObject.string(TimeZone.current.identifier))
+            .ref(DalvikObject.string(pluginTimeZone().identifier))
         }
         vm.register("Ljava/util/Locale;", "getDefault") { _, _, _ in
             .ref(DalvikObject(className: "Ljava/util/Locale;"))

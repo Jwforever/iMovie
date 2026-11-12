@@ -639,6 +639,17 @@ extension DalvikNatives {
             box((this?.payload as? Decimal) ?? 0)
         }
         vm.register("Ljava/math/BigDecimal;", "setScale") { _, this, _ in .ref(this) }
+        vm.register("Ljava/math/BigDecimal;", "valueOf") { _, _, args in
+            let number: Decimal
+            if let raw = string(args.first ?? .ref(nil)) {
+                number = Decimal(string: raw) ?? 0
+            } else if let value = args.first {
+                number = Decimal(Double(value.doubleValue))
+            } else {
+                number = 0
+            }
+            return box(number)
+        }
         vm.register("Ljava/math/BigDecimal;", "intValue") { _, this, _ in
             .int(NSDecimalNumber(decimal: (this?.payload as? Decimal) ?? 0).int32Value)
         }
