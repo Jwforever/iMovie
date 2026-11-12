@@ -57,6 +57,43 @@ extension DalvikNatives {
             vm.register(owner, "<init>") { _, this, args in this?.payload = bytes(args.first); return .ref(nil) }
             vm.register(owner, "getEncoded") { _, this, _ in array(this?.payload as? Data ?? Data()) }
         }
+        // 采集器普遍用 HmacSHA256 给播放接口签名。之前 Ljavax/ 被当成"无关框架"
+        // 静默返回 null，签名位就是空的，站点直接 400。这里按 Java Mac 语义补齐。
+        vm.register("Ljavax/crypto/Mac;", "getInstance") { _, _, args in
+            let object = DalvikObject(className: "Ljavax/crypto/Mac;")
+            object.fields["algorithm"] = args.first
+            object.payload = Data()
+            return .ref(object)
+        }
+        vm.register("Ljavax/crypto/Mac;", "init") { _, this, args in
+            // init(Key) 或 init(Key, AlgorithmParameterSpec)，密钥都在最后一个 Key 里。
+            this?.fields["key"] = args.last
+            this?.payload = Data()
+            return .ref(nil)
+        }
+        vm.register("Ljavax/crypto/Mac;", "update") { _, this, args in
+            var data = this?.payload as? Data ?? Data()
+            data.append(bytes(args.first))
+            this?.payload = data
+            return .ref(nil)
+        }
+        vm.register("Ljavax/crypto/Mac;", "reset") { _, this, _ in this?.payload = Data(); return .ref(nil) }
+        vm.register("Ljavax/crypto/Mac;", "getMacLength") { _, this, _ in
+            .int(Int32(macLength(text(this?.fields["algorithm"]))))
+        }
+        vm.register("Ljavax/crypto/Mac;", "doFinal") { _, this, args in
+            var data = this?.payload as? Data ?? Data()
+            if let first = args.first, !first.isNull { data.append(bytes(first)) }
+            let key = bytes(this?.fields["key"])
+            let algorithm = text(this?.fields["algorithm"]).uppercased()
+                .replacingOccurrences(of: "-", with: "")
+            guard let spec = macAlgorithm(algorithm) else {
+                return try exception("尚未支持 MAC 算法 \(algorithm)")
+            }
+            let result = hmac(spec.algorithm, key: key, data: data, length: spec.length)
+            this?.payload = Data()
+            return array(result)
+        }
         vm.register("Ljavax/crypto/Cipher;", "getInstance") { _, _, args in
             let object = DalvikObject(className: "Ljavax/crypto/Cipher;"); object.fields["algorithm"] = args.first; return .ref(object)
         }
@@ -94,5 +131,34 @@ extension DalvikNatives {
             guard status == kCCSuccess else { return try exception("AES 解密失败 (\(status))") }
             output.count = written; return array(output)
         }
+    }
+
+    private static func macAlgorithm(_ name: String) -> (algorithm: CCHmacAlgorithm, length: Int)? {
+        switch name {
+        case "HMACMD5": return (CCHmacAlgorithm(kCCHmacAlgMD5), 16)
+        case "HMACSHA1": return (CCHmacAlgorithm(kCCHmacAlgSHA1), 20)
+        case "HMACSHA224": return (CCHmacAlgorithm(kCCHmacAlgSHA224), 28)
+        case "HMACSHA256": return (CCHmacAlgorithm(kCCHmacAlgSHA256), 32)
+        case "HMACSHA384": return (CCHmacAlgorithm(kCCHmacAlgSHA384), 48)
+        case "HMACSHA512": return (CCHmacAlgorithm(kCCHmacAlgSHA512), 64)
+        default: return nil
+        }
+    }
+
+    private static func macLength(_ name: String) -> Int {
+        macAlgorithm(name.uppercased().replacingOccurrences(of: "-", with: ""))?.length ?? 0
+    }
+
+    private static func hmac(_ algorithm: CCHmacAlgorithm, key: Data, data: Data, length: Int) -> Data {
+        var output = Data(count: length)
+        output.withUnsafeMutableBytes { destination in
+            key.withUnsafeBytes { secret in
+                data.withUnsafeBytes { message in
+                    CCHmac(algorithm, secret.baseAddress, key.count,
+                           message.baseAddress, data.count, destination.baseAddress)
+                }
+            }
+        }
+        return output
     }
 }

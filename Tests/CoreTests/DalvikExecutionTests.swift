@@ -224,6 +224,29 @@ final class DalvikExecutionTests: XCTestCase {
         XCTAssertEqual(vm.httpTrace.first?.bodyBytes, 17)
     }
 
+    func testMacProducesHmacSha256Signature() throws {
+        let (vm, _) = try machine([0x000E])
+        func byteArray(_ text: String) -> DalvikObject {
+            let object = DalvikObject(className: "[B")
+            object.items = Array(text.utf8).map { .int(Int32(Int8(bitPattern: $0))) }
+            return object
+        }
+        let secret = DalvikObject(className: "Ljavax/crypto/spec/SecretKeySpec;")
+        let initKey = try XCTUnwrap(vm.nativeBody("Ljavax/crypto/spec/SecretKeySpec;", "<init>"))
+        _ = try initKey(vm, secret, [.ref(byteArray("secret")), .ref(DalvikObject.string("HmacSHA256"))])
+
+        let getInstance = try XCTUnwrap(vm.nativeBody("Ljavax/crypto/Mac;", "getInstance"))
+        let mac = try XCTUnwrap(getInstance(vm, nil, [.ref(DalvikObject.string("HmacSHA256"))]).asObject)
+        let initMac = try XCTUnwrap(vm.nativeBody("Ljavax/crypto/Mac;", "init"))
+        _ = try initMac(vm, mac, [.ref(secret)])
+        let doFinal = try XCTUnwrap(vm.nativeBody("Ljavax/crypto/Mac;", "doFinal"))
+        let result = try XCTUnwrap(doFinal(vm, mac, [.ref(byteArray("hello"))]).asObject)
+        let hex = (result.items ?? []).map {
+            String(format: "%02x", UInt8(truncatingIfNeeded: $0.intValue))
+        }.joined()
+        XCTAssertEqual(hex, "88aab3ede8d3adf94d26ab90d3bafd4a2083070c3bcce9c014ee04a443847c0b")
+    }
+
     func testDetailPassesPluginEpisodeValueThroughUnchanged() throws {
         // 插件自己会把 `{playUrl=..., play_id=...}` 反解成 Map；应用不能替它"提取" URL。
         let raw = """
