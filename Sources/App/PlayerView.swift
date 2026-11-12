@@ -219,9 +219,6 @@ final class StreamingBypassLoader: NSObject, AVAssetResourceLoaderDelegate {
                    let type = UTType(mimeType: mime) {
                     info.contentType = type.identifier
                 }
-                if http.expectedContentLength > 0 {
-                    info.expectedContentLength = http.expectedContentLength
-                }
             }
             request.dataRequest?.respond(with: data)
             request.finishLoading()
