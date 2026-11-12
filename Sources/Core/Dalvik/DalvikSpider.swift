@@ -6,6 +6,7 @@ import Foundation
 /// 应用里没有任何站点常量。
 enum DalvikSpiderAction {
     case home
+    case homeVideo
     case category(id: String, page: String)
     case detail(id: String)
     case search(keyword: String)
@@ -14,6 +15,7 @@ enum DalvikSpiderAction {
     var methodName: String {
         switch self {
         case .home: return "homeContent"
+        case .homeVideo: return "homeVideoContent"
         case .category: return "categoryContent"
         case .detail: return "detailContent"
         case .search: return "searchContent"
@@ -147,6 +149,11 @@ enum DalvikSpider {
 
         let result: DalvikValue?
         switch action {
+        case .homeVideo:
+            guard let method = vm.findMethod(className, "homeVideoContent", []) else {
+                throw ViewerError.message("\(shortName) 没有 homeVideoContent。")
+            }
+            result = try vm.invoke(method, [], spider)
         case .home:
             guard let method = vm.findMethod(className, "homeContent", ["Z"]) else {
                 throw ViewerError.message("\(shortName) 没有 homeContent。")

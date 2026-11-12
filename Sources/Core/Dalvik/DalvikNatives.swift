@@ -249,8 +249,8 @@ enum DalvikNatives {
             if left == right { return .int(0) }
             return .int(left < right ? -1 : 1)
         }
-        vm.register("Ljava/lang/String;", "valueOf") { _, _, args in
-            .ref(DalvikObject.string(text(args.first)))
+        vm.register("Ljava/lang/String;", "valueOf") { vm, _, args in
+            .ref(DalvikObject.string(javaText(vm, args.first)))
         }
         vm.register("Ljava/lang/String;", "format") { _, _, args in
             let format = string(args.first ?? .ref(nil)) ?? ""
@@ -268,7 +268,7 @@ enum DalvikNatives {
                     if spec == "n" { result.append("\n"); index = format.index(after: nextIndex); continue }
                     let value = rest.isEmpty ? .ref(nil) : rest.removeFirst()
                     if spec == "d" { result += String(value.intValue) }
-                    else { result += text(value) }
+                    else { result += javaText(vm, value) }
                     index = format.index(after: nextIndex)
                     continue
                 }
@@ -301,7 +301,7 @@ enum DalvikNatives {
             vm.register(className, "append") { vm, this, args in
                 let current = this?.fields[bufferKey]?.asObject?.stringPayload ?? ""
                 let character = vm.invocationParameters.last == "C"
-                var suffix = character ? String(decoding: [UInt16(truncatingIfNeeded: args.first?.intValue ?? 0)], as: UTF16.self) : text(args.first)
+                var suffix = character ? String(decoding: [UInt16(truncatingIfNeeded: args.first?.intValue ?? 0)], as: UTF16.self) : javaText(vm, args.first)
                 if vm.invocationParameters.first == "[C" {
                     suffix = String(decoding: (args.first?.asObject?.items ?? []).map { UInt16(truncatingIfNeeded: $0.intValue) }, as: UTF16.self)
                 }
