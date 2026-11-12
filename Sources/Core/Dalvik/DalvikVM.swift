@@ -24,10 +24,10 @@ final class DalvikVM {
 
     /// 服务端请求记录，方便排查"为什么没内容"。
     private(set) var httpLog: [(url: String, code: Int)] = []
-    /// 与 httpLog 一一对应，额外记录方法 / 请求体大小 / Content-Type。
+    /// 与 httpLog 一一对应，额外记录方法 / 请求体 / Content-Type / 响应摘要。
     /// 插件拿不到结果时，光看 URL 分不清是表单没发出去还是站点拒绝。
     private(set) var httpTrace: [(url: String, code: Int, method: String, bodyBytes: Int,
-                                 contentType: String, response: String)] = []
+                                 contentType: String, bodyPreview: String, response: String)] = []
     /// 最近一次成功请求的地址；插件拼出 `?filter=true` 这类相对地址时用它补全。
     var baseURL: URL?
     /// 解释器内部的异常 / 缺实现记录。插件自己 try/catch 吞掉异常后只回 `{}`，
@@ -87,9 +87,9 @@ final class DalvikVM {
     }
 
     func log(_ url: String, _ code: Int, method: String = "GET", bodyBytes: Int = 0,
-             contentType: String = "", response: String = "") {
+             contentType: String = "", bodyPreview: String = "", response: String = "") {
         httpLog.append((url, code))
-        httpTrace.append((url, code, method, bodyBytes, contentType, String(response.prefix(500))))
+        httpTrace.append((url, code, method, bodyBytes, contentType, String(bodyPreview.prefix(300)), String(response.prefix(500))))
         if httpLog.count > 40 {
             httpLog.removeFirst()
             httpTrace.removeFirst()

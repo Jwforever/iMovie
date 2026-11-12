@@ -96,7 +96,7 @@ final class PluginChainDiagnosticsTests: XCTestCase {
                 report["detailRaw"] = String(detailRun.json.prefix(400))
                 report["detailRequests"] = detailRun.requestTrace.map {
                     ["url": $0.url, "code": $0.code, "method": $0.method,
-                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "response": $0.response] as [String: Any]
+                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "body": $0.bodyPreview, "response": $0.response] as [String: Any]
                 }
 
                 // 3. 播放。CatVod 有两种传法：只给 `$` 后面的值，或整条 `名称$值`。
@@ -118,7 +118,7 @@ final class PluginChainDiagnosticsTests: XCTestCase {
                         "json": String(run.json.prefix(400)),
                         "requests": run.requestTrace.map {
                             ["url": $0.url, "code": $0.code, "method": $0.method,
-                             "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "response": $0.response] as [String: Any]
+                             "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "body": $0.bodyPreview, "response": $0.response] as [String: Any]
                         }
                     ] as [String: Any])
                     notes += run.notes.map { ["stage": "player", "note": $0] }
@@ -136,7 +136,7 @@ final class PluginChainDiagnosticsTests: XCTestCase {
                 report["playRaw"] = String(playRun.json.prefix(400))
                 report["playRequests"] = playRun.requestTrace.map {
                     ["url": $0.url, "code": $0.code, "method": $0.method,
-                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "response": $0.response] as [String: Any]
+                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType, "body": $0.bodyPreview, "response": $0.response] as [String: Any]
                 }
             } catch {
                 stages.append(Stage(name: "error", ok: false, detail: error.localizedDescription))

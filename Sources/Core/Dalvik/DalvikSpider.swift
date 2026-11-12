@@ -30,7 +30,7 @@ struct DalvikRunResult {
     var json: String
     var requests: [(url: String, code: Int)]
     var requestTrace: [(url: String, code: Int, method: String, bodyBytes: Int,
-                        contentType: String, response: String)] = []
+                        contentType: String, bodyPreview: String, response: String)] = []
     var steps: Int
     var seconds: Double
     var notes: [String] = []

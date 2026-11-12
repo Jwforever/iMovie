@@ -514,6 +514,7 @@ extension DalvikNatives {
         vm.log(request.url, result.code, method: request.method,
                bodyBytes: request.body?.count ?? 0,
                contentType: mutable.value(forHTTPHeaderField: "Content-Type") ?? "",
+               bodyPreview: request.body.map { DalvikNatives.decode(Data($0.prefix(600))) } ?? "",
                response: DalvikNatives.decode(Data(result.body.prefix(4096))))
         return result
     }
@@ -577,6 +578,80 @@ extension DalvikNatives {
         vm.register("Lcom/github/catvod/crawler/Spider;", "destroy") { _, _, _ in .ref(nil) }
         vm.register("Lcom/github/catvod/crawler/Spider;", "getName") { _, _, _ in
             .ref(DalvikObject.string(""))
+        }
+    }
+
+    // MARK: - 数学
+
+    /// 采集器用 BigDecimal 做播放地址参数计算（奥特等站的内置库静态初始化就要它）。
+    static func math(_ vm: DalvikVM) {
+        func fail(_ message: String) throws -> DalvikValue {
+            throw DalvikError.java(message)
+        }
+        func decimal(_ value: DalvikValue?) -> Decimal {
+            if let number = value?.asObject?.payload as? Decimal { return number }
+            if let raw = string(value ?? .ref(nil)) { return Decimal(string: raw) ?? 0 }
+            if let value { return Decimal(Double(value.doubleValue)) }
+            return 0
+        }
+        func box(_ number: Decimal) -> DalvikValue {
+            let object = DalvikObject(className: "Ljava/math/BigDecimal;")
+            object.payload = number
+            return .ref(object)
+        }
+        vm.register("Ljava/math/BigDecimal;", "<init>") { _, this, args in
+            this?.payload = decimal(args.first)
+            return .ref(nil)
+        }
+        vm.register("Ljava/math/BigDecimal;", "add") { _, this, args in
+            box(((this?.payload as? Decimal) ?? 0) + decimal(args.first))
+        }
+        vm.register("Ljava/math/BigDecimal;", "subtract") { _, this, args in
+            box(((this?.payload as? Decimal) ?? 0) - decimal(args.first))
+        }
+        vm.register("Ljava/math/BigDecimal;", "multiply") { _, this, args in
+            box(((this?.payload as? Decimal) ?? 0) * decimal(args.first))
+        }
+        vm.register("Ljava/math/BigDecimal;", "divide") { _, this, args in
+            let divisor = decimal(args.first)
+            guard divisor != 0 else { return try fail("BigDecimal 除零") }
+            box(((this?.payload as? Decimal) ?? 0) / divisor)
+        }
+        vm.register("Ljava/math/BigDecimal;", "remainder") { _, this, args in
+            let divisor = decimal(args.first)
+            guard divisor != 0 else { return try fail("BigDecimal 除零") }
+            box(((this?.payload as? Decimal) ?? 0).truncatingRemainder(dividingBy: divisor))
+        }
+        vm.register("Ljava/math/BigDecimal;", "negate") { _, this, _ in
+            box(-((this?.payload as? Decimal) ?? 0))
+        }
+        vm.register("Ljava/math/BigDecimal;", "abs") { _, this, _ in
+            let value = (this?.payload as? Decimal) ?? 0
+            box(value < 0 ? -value : value)
+        }
+        vm.register("Ljava/math/BigDecimal;", "stripTrailingZeros") { _, this, _ in
+            box((this?.payload as? Decimal) ?? 0)
+        }
+        vm.register("Ljava/math/BigDecimal;", "setScale") { _, this, _ in .ref(this) }
+        vm.register("Ljava/math/BigDecimal;", "intValue") { _, this, _ in
+            .int(NSDecimalNumber(decimal: (this?.payload as? Decimal) ?? 0).int32Value)
+        }
+        vm.register("Ljava/math/BigDecimal;", "longValue") { _, this, _ in
+            .long(NSDecimalNumber(decimal: (this?.payload as? Decimal) ?? 0).int64Value)
+        }
+        vm.register("Ljava/math/BigDecimal;", "doubleValue") { _, this, _ in
+            .double(NSDecimalNumber(decimal: (this?.payload as? Decimal) ?? 0).doubleValue)
+        }
+        vm.register("Ljava/math/BigDecimal;", "toString") { _, this, _ in
+            .ref(DalvikObject.string(NSDecimalNumber(decimal: (this?.payload as? Decimal) ?? 0).stringValue))
+        }
+        vm.register("Ljava/math/BigDecimal;", "toPlainString") { _, this, _ in
+            .ref(DalvikObject.string(NSDecimalNumber(decimal: (this?.payload as? Decimal) ?? 0).stringValue))
+        }
+        vm.register("Ljava/math/BigDecimal;", "compareTo") { _, this, args in
+            let left = (this?.payload as? Decimal) ?? 0
+            let right = decimal(args.first)
+            return .int(left == right ? 0 : (left < right ? -1 : 1))
         }
     }
 

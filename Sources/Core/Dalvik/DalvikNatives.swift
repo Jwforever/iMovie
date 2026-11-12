@@ -16,6 +16,7 @@ enum DalvikNatives {
         io(vm)
         network(vm)
         android(vm)
+        math(vm)
         aliases(vm)
         javaSupport(vm)
         reflectionSupport(vm)
