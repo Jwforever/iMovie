@@ -50,6 +50,22 @@ enum CatVodPayload {
                          page: max(1, page), pageCount: pageCount)
     }
 
+    /// 少数采集器把每集写成 `名称${playUrl=..., play_id=...}`（Java Map 的 toString），
+    /// 需要在交给播放器前取出真正的地址。
+    static func normalizePlayURL(_ raw: String) -> String {
+        guard raw.contains("playUrl=") else { return raw }
+        return raw.components(separatedBy: "#").map { entry -> String in
+            let parts = entry.components(separatedBy: "$")
+            guard parts.count >= 2, parts[1].hasPrefix("{") else { return entry }
+            let body = parts[1]
+            guard let range = body.range(of: "playUrl=") else { return entry }
+            let rest = body[range.upperBound...]
+            let value = rest.prefix { $0 != "," && $0 != "}" }.trimmingCharacters(in: .whitespaces)
+            guard !value.isEmpty else { return entry }
+            return parts[0] + "$" + value
+        }.joined(separator: "#")
+    }
+
     /// 详情：插件把整条记录放在 list[0] 里。
     static func detail(_ raw: String) -> Video? {
         guard let root = dictionary(raw), let items = root["list"] as? [[String: Any]],
@@ -61,7 +77,7 @@ enum CatVodPayload {
         if name.isEmpty { name = id }
         guard !name.isEmpty else { return nil }
         let playFrom = text(item["vod_play_from"])
-        var playURL = text(item["vod_play_url"])
+        var playURL = normalizePlayURL(text(item["vod_play_url"]))
         // 有些插件用 vod_play_list / vod_play_url_list 这种成对数组。
         if playURL.isEmpty, let list = item["vod_play_url_list"] as? [Any] {
             playURL = list.map { text($0) }.joined(separator: "$$$")
