@@ -32,8 +32,14 @@ enum DalvikHTMLSupport {
         func elementOf(_ value: DalvikValue?) -> Element? {
             value?.asObject?.payload as? Element
         }
+        func elementOf(_ object: DalvikObject?) -> Element? {
+            object?.payload as? Element
+        }
         func nodesOf(_ value: DalvikValue?) -> Node? {
             value?.asObject?.payload as? Node
+        }
+        func nodesOf(_ object: DalvikObject?) -> Node? {
+            object?.payload as? Node
         }
 
         for info in vm.image.classes.values {
