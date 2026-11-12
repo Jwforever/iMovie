@@ -10,6 +10,7 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var duration = 0.0
     @Published private(set) var media: MediaLink?
     @Published private(set) var resolving = false
+    @Published private(set) var speed = 1.0
     let sessionID = UUID().uuidString
     var onProgress: ((MediaLink, Double) -> Void)?
     private var resolutionTask: Task<Void, Never>?
@@ -121,6 +122,11 @@ final class PlaybackController: ObservableObject {
     func playPause() { surface?.playPause() }
     func seek(to seconds: Double) { surface?.seek(to: seconds) }
 
+    func setSpeed(_ value: Double) {
+        speed = value
+        surface?.setSpeed(value)
+    }
+
     var position: Double {
         if duration > 0 {
             return elapsed.isFinite && elapsed < duration - 3 ? elapsed : 0
@@ -172,17 +178,16 @@ final class PlaybackController: ObservableObject {
 @MainActor struct PlaybackSurface: View {
     @ObservedObject var controller: PlaybackController
     var fills = false
-    @State private var showControls = false
+    @State private var showControls = true
     @State private var seeking = false
     @State private var seekValue: Double = 0
+    @State private var hideTask: Task<Void, Never>?
 
     var body: some View {
         NativeVideoPlayer(playback: controller)
             .modifier(PlaybackSurfaceStyle(fills: fills))
             .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
-            }
+            .onTapGesture { toggleControls() }
             .overlay { controls }
             .accessibilityIdentifier("native-player")
             .accessibilityValue(controller.isPlaying ? "playing" : "waiting")
@@ -195,31 +200,68 @@ final class PlaybackController: ObservableObject {
             }
     }
 
+    private func toggleControls() {
+        withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+        if showControls { scheduleHide() } else { hideTask?.cancel() }
+    }
+
+    private func scheduleHide() {
+        hideTask?.cancel()
+        hideTask = Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if !Task.isCancelled {
+                withAnimation(.easeInOut(duration: 0.2)) { showControls = false }
+            }
+        }
+    }
+
     @ViewBuilder private var controls: some View {
         if showControls {
             VStack {
                 Spacer()
                 HStack(spacing: 12) {
-                    Button { controller.playPause() } label: {
+                    Button { controller.playPause(); scheduleHide() } label: {
                         Image(systemName: controller.isPlaying ? "pause.fill" : "play.fill")
                             .font(.title2)
                     }
+                    Button {
+                        controller.seek(to: max(0, controller.elapsed - 10))
+                        scheduleHide()
+                    } label: {
+                        Image(systemName: "gobackward.10").font(.title3)
+                    }
                     if controller.duration > 0 {
-                        Text(Self.timeString(controller.elapsed))
+                        Text(Self.timeString(seeking ? seekValue : controller.elapsed))
                             .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         Slider(value: Binding(
                             get: { seeking ? seekValue : min(controller.elapsed, max(controller.duration, 0.1)) },
                             set: { seekValue = $0 }), in: 0...max(controller.duration, 0.1)) { editing in
                             seeking = editing
-                            if !editing { controller.seek(to: seekValue) }
+                            if !editing {
+                                controller.seek(to: seekValue)
+                                scheduleHide()
+                            }
                         }
                         Text(Self.timeString(controller.duration))
                             .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    } else {
+                        Text(controller.hasVideoFrame ? "直播流" : "正在缓冲…")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Menu {
+                        ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { value in
+                            Button(String(format: "%.2fx", value)) { controller.setSpeed(value) }
+                        }
+                    } label: {
+                        Text(String(format: "%.2fx", controller.speed)).font(.caption.monospacedDigit())
                     }
                 }
                 .padding(12)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 .padding(12)
+            }
+            .onChange(of: controller.isPlaying) { playing in
+                if playing { scheduleHide() }
             }
         }
     }

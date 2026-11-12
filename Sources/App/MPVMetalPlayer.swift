@@ -44,6 +44,9 @@ final class MPVMetalViewController: UIViewController {
     var onPropertyChange: ((String, Any?) -> Void)?
     var onEnded: ((_ error: String?) -> Void)?
     weak var playback: PlaybackController?
+    /// 最近几条 mpv 警告/错误日志，播放失败时带进界面错误里，便于定位。
+    private var recentLogs: [String] = []
+    private let logsLock = NSLock()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -79,7 +82,10 @@ final class MPVMetalViewController: UIViewController {
 
     private func setupMpv() {
         mpv = mpv_create()
-        guard mpv != nil else { return }
+        guard mpv != nil else {
+            DispatchQueue.main.async { [weak self] in self?.playback?.ended("mpv 引擎创建失败") }
+            return
+        }
         checkError(mpv_request_log_messages(mpv, "warn"))
         checkError(mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &metalLayer))
         checkError(mpv_set_option_string(mpv, "vo", "gpu-next"))
@@ -93,7 +99,14 @@ final class MPVMetalViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "cache", "yes"))
         checkError(mpv_set_option_string(mpv, "demuxer-max-bytes", "64MiB"))
         checkError(mpv_set_option_string(mpv, "force-window", "no"))
-        checkError(mpv_initialize(mpv))
+        let status = mpv_initialize(mpv)
+        if status < 0 {
+            let message = String(cString: mpv_error_string(status))
+            DispatchQueue.main.async { [weak self] in
+                self?.playback?.ended("mpv 初始化失败：\(message)（\(self.logTail())）")
+            }
+            return
+        }
 
         mpv_observe_property(mpv, 0, "time-pos", MPV_FORMAT_DOUBLE)
         mpv_observe_property(mpv, 0, "duration", MPV_FORMAT_DOUBLE)
@@ -115,19 +128,23 @@ final class MPVMetalViewController: UIViewController {
             pendingLoad = (url, headers, start)
             return
         }
-        var options: [String] = []
-        if !headers.isEmpty {
-            options.append("http-header-fields=" + headers.map { "\($0.key): \($0.value)" }.joined(separator: ","))
-        }
-        if start > 3 {
-            options.append("start=\(Int(start))")
-        }
+        logsLock.lock()
+        recentLogs.removeAll()
+        logsLock.unlock()
+        // 头信息用属性设置（列表属性按逗号切分），比 loadfile 选项串更稳；换集时先清空。
+        let fields = headers.map { "\($0.key): \($0.value)" }.joined(separator: ",")
+        checkError(mpv_set_property_string(mpv, "http-header-fields", headers.isEmpty ? "" : fields))
         var args = [url, "replace"]
-        if !options.isEmpty {
-            args.append(options.joined(separator: ","))
+        if start > 3 {
+            args.append("start=\(Int(start))")
         }
         command("loadfile", args: args)
         setFlag("pause", false)
+    }
+
+    func setSpeed(_ speed: Double) {
+        guard mpv != nil else { return }
+        checkError(mpv_set_property_string(mpv, "speed", String(format: "%.2f", speed)))
     }
 
     func playPause() {
@@ -165,8 +182,11 @@ final class MPVMetalViewController: UIViewController {
                     let pointer = UnsafeMutablePointer<mpv_event_end_file>(OpaquePointer(event.pointee.data))
                     let reason = pointer?.pointee.reason ?? MPV_END_FILE_REASON_EOF
                     if reason == MPV_END_FILE_REASON_ERROR {
-                        let message = pointer.map { String(cString: mpv_error_string($0.pointee.error)) } ?? "播放失败"
-                        DispatchQueue.main.async { [weak self] in self?.playback?.ended(message) }
+                        let code = pointer.map { String(cString: mpv_error_string($0.pointee.error)) } ?? "播放失败"
+                        let tail = self.logTail()
+                        DispatchQueue.main.async { [weak self] in
+                            self?.playback?.ended(tail.isEmpty ? code : "\(code)（\(tail)）")
+                        }
                     } else if reason == MPV_END_FILE_REASON_EOF {
                         DispatchQueue.main.async { [weak self] in self?.playback?.ended(nil) }
                     }
@@ -174,8 +194,11 @@ final class MPVMetalViewController: UIViewController {
                     let message = UnsafeMutablePointer<mpv_event_log_message>(OpaquePointer(event.pointee.data))
                     if let message {
                         let level = String(cString: message.pointee.level)
-                        let text = String(cString: message.pointee.text)
-                        NSLog("mpv[\(level)] %@", text.trimmingCharacters(in: .whitespacesAndNewlines))
+                        let text = String(cString: message.pointee.text).trimmingCharacters(in: .whitespacesAndNewlines)
+                        NSLog("mpv[\(level)] %@", text)
+                        if level == "warn" || level == "error" || level == "fatal" {
+                            self.appendLog("[\(level)] \(text)")
+                        }
                     }
                 case MPV_EVENT_SHUTDOWN:
                     return
@@ -258,9 +281,22 @@ final class MPVMetalViewController: UIViewController {
         checkError(mpv_command(mpv, &pointers))
     }
 
+    private func appendLog(_ text: String) {
+        logsLock.lock()
+        recentLogs.append(text)
+        if recentLogs.count > 4 { recentLogs.removeFirst() }
+        logsLock.unlock()
+    }
+
+    private func logTail() -> String {
+        logsLock.lock()
+        defer { logsLock.unlock() }
+        return recentLogs.joined(separator: " | ")
+    }
+
     private func checkError(_ status: CInt) {
         if status < 0 {
-            NSLog("mpv error: %@", String(cString: mpv_error_string(status)))
+            appendLog("mpv error: " + String(cString: mpv_error_string(status)))
         }
     }
 }

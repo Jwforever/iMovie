@@ -422,9 +422,30 @@ import SwiftUI
           ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 Group {
-                    // 详情信息块始终参与布局（选集后隐藏但保留占位），
-                    // 播放器覆盖在同一块区域上：替换前后大小完全一致，没有跳动。
-                    ZStack(alignment: .topLeading) {
+                    // 选集后播放器以固定 16:9 尺寸替换详情区，不随简介长度伸缩。
+                    if let selection {
+                        VStack(alignment: .leading, spacing: 12) {
+                            PlaybackSurface(controller: playback)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("\(shownVideo.title) · \(selection.title)").font(.headline)
+                                    Text(selectedLine ?? site.name).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if let media = playback.media {
+                                    Button { store.toggleFavorite(media) } label: {
+                                        Image(systemName: store.isFavorite(media) ? "bookmark.fill" : "bookmark")
+                                    }.accessibilityLabel(store.isFavorite(media) ? "取消收藏" : "收藏")
+                                }
+                            }
+                            if playback.resolving { ProgressView("正在提取视频链接…") }
+                            if let error = playback.error {
+                                Text(error).font(.subheadline).foregroundStyle(.orange)
+                                Button("重新获取播放链接") { play(selection, line: selectedLine ?? "") }.buttonStyle(.bordered)
+                            }
+                        }
+                        .transition(.opacity)
+                    } else {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(alignment: .top, spacing: 14) {
                                 PosterView(url: shownVideo.poster).frame(width: 84)
@@ -441,35 +462,9 @@ import SwiftUI
                             }
                             Text("选择下方剧集开始播放").font(.caption).foregroundStyle(.secondary)
                         }
-                        .opacity(selection == nil ? 1 : 0)
                         .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("detail-introduction")
-
-                        if let selection {
-                            VStack(alignment: .leading, spacing: 12) {
-                                PlaybackSurface(controller: playback, fills: true)
-                                    .clipShape(RoundedRectangle(cornerRadius: 15))
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text("\(shownVideo.title) · \(selection.title)").font(.headline)
-                                        Text(selectedLine ?? site.name).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    if let media = playback.media {
-                                        Button { store.toggleFavorite(media) } label: {
-                                            Image(systemName: store.isFavorite(media) ? "bookmark.fill" : "bookmark")
-                                        }.accessibilityLabel(store.isFavorite(media) ? "取消收藏" : "收藏")
-                                    }
-                                }
-                                if playback.resolving { ProgressView("正在提取视频链接…") }
-                                if let error = playback.error {
-                                    Text(error).font(.subheadline).foregroundStyle(.orange)
-                                    Button("重新获取播放链接") { play(selection, line: selectedLine ?? "") }.buttonStyle(.bordered)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                            .transition(.opacity)
-                        }
+                        .transition(.opacity)
                     }
                 }.id("detail-top")
                 if loading { ProgressView("正在加载选集…") }
