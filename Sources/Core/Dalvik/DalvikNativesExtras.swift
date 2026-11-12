@@ -621,7 +621,7 @@ extension DalvikNatives {
         }
         vm.register("Ljava/math/BigDecimal;", "remainder") { _, this, args in
             let divisor = decimal(args.first)
-            guard divisor != 0 else { return try fail("BigDecimal 除零") }
+            guard divisor != 0 else { return box(0) }
             let dividend = NSDecimalNumber(decimal: (this?.payload as? Decimal) ?? 0)
             let behavior = NSDecimalNumberHandler(roundingMode: .down, scale: 0, raiseOnExactness: false,
                                                   raiseOnOverflow: false, raiseOnUnderflow: false,
