@@ -22,6 +22,7 @@ enum DalvikNatives {
         gsonSupport(vm)
         cryptoSupport(vm)
         hostSupport(vm)
+        dateSupport(vm)
     }
 
     // MARK: - 取值助手
