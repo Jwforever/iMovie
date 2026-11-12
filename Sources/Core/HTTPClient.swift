@@ -5,7 +5,8 @@ import FoundationNetworking
 
 public struct HTTPClient {
     private let allowsInvalidCertificate: Bool
-    public init(allowsInvalidCertificate: Bool = false) { self.allowsInvalidCertificate = allowsInvalidCertificate }
+    /// 采集源站点普遍自签/过期证书，默认放行（LiveNetwork 统一信任）。
+    public init(allowsInvalidCertificate: Bool = true) { self.allowsInvalidCertificate = allowsInvalidCertificate }
 
     public func data(from url: URL, headers: [String: String] = [:], cacheLifetime: TimeInterval = 0) async throws -> (Data, URL) {
         var request = URLRequest(url: url, timeoutInterval: 25)

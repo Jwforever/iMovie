@@ -60,7 +60,7 @@ actor ImageCache {
             if host == "doubanio.com" || host.hasSuffix(".doubanio.com") {
                 request.setValue("https://m.douban.com/", forHTTPHeaderField: "Referer")
             }
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await LiveNetwork.shared.session.data(for: request)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
                   !data.isEmpty, data.count <= 12 * 1024 * 1024, UIImage(data: data) != nil else {
                 throw ViewerError.message("图片暂时无法加载。")

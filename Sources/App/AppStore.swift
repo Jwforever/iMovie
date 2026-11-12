@@ -41,6 +41,9 @@ final class AppStore: ObservableObject {
     @Published private(set) var health: [String: SourceHealth] = [:]
     /// 导入配置时定下来的固定顺序；界面只按它渲染，不随后台探测跳动。
     @Published private(set) var sourceOrder: [String] = []
+    /// 导入后后台探测来源可用性，探测失败的源从列表里隐藏。
+    @Published private(set) var probingSources = false
+    @Published private(set) var hideFailedSources: Bool
     private var sourceRules: [String: GenericSourceRule]
 
     var homeSource: SourceSite? {
@@ -76,6 +79,7 @@ final class AppStore: ObservableObject {
         health = Self.load([String: SourceHealth].self, key: "sourceHealth", defaults: storage) ?? [:]
         sourceRules = Self.load([String: GenericSourceRule].self, key: "sourceRules", defaults: storage) ?? [:]
         sourceOrder = Self.load([String].self, key: "sourceOrder", defaults: storage) ?? []
+        hideFailedSources = storage.object(forKey: "hideFailedSources") == nil ? true : storage.bool(forKey: "hideFailedSources")
         SpiderSource.shared.update(config?.spider)
     }
 
@@ -89,9 +93,18 @@ final class AppStore: ObservableObject {
     /// 3 有内容，2 未测过，1 拉到空列表，0 请求失败
     func rank(of site: SourceSite) -> Int { health[site.key]?.rank ?? 2 }
 
+    func setHideFailedSources(_ value: Bool) {
+        hideFailedSources = value
+        defaults.set(value, forKey: "hideFailedSources")
+    }
+
     /// 固定顺序下的来源列表，界面只读这个。
+    /// 打开"只保留可用"时，探测失败的源被隐藏（未测过的保留），默认源始终显示。
     var orderedSites: [SourceSite] {
-        SourceOrdering.apply(order: sourceOrder, to: config?.sites ?? [])
+        let sites = SourceOrdering.apply(order: sourceOrder, to: config?.sites ?? [])
+        guard hideFailedSources else { return sites }
+        let usable = sites.filter { rank(of: $0) > 0 || $0.key == homeSourceKey }
+        return usable.isEmpty ? sites : usable
     }
 
     /// 重算并保存顺序。只在导入配置、探测整批结束、切换默认源时调用，
@@ -107,14 +120,55 @@ final class AppStore: ObservableObject {
     }
 
     /// 试拉一个来源的首屏，结果写进 health，让列表能自己把可用的排上去。
+    /// 原生接口与插件源都测：插件源走设备内解释器。
     func probe(_ site: SourceSite) async {
-        guard site.isNative else { return }
         do {
-            let page = try await TVAPIClient().page(site: site, page: 1)
+            let page = try await withTimeout(seconds: 40) { try await TVAPIClient().page(site: site, page: 1) }
             recordHealth(site.key, ok: true, items: page.videos.count)
         } catch is CancellationError {
         } catch {
             recordHealth(site.key, ok: false, items: 0)
+        }
+    }
+
+    /// 导入后把全部来源探一遍；失败的记 0 分，配合"只保留可用"过滤掉。
+    func probeAllSources() async {
+        guard let config, !probingSources else { return }
+        probingSources = true
+        defer { probingSources = false }
+        // 12 小时内刚测成功的不重复测，失败的和没测过的每次都测。
+        let pending = config.sites.filter { site in
+            guard let record = health[site.key], record.ok,
+                  Date().timeIntervalSince(record.at) < 12 * 3600 else { return true }
+            return false
+        }
+        let limit = 4
+        var index = pending.startIndex
+        while index < pending.endIndex {
+            let chunk = pending[index..<min(index + limit, pending.endIndex)]
+            await withTaskGroup(of: Void.self) { group in
+                for site in chunk {
+                    group.addTask { [weak self] in await self?.probe(site) }
+                }
+            }
+            index += limit
+        }
+        rebuildSourceOrder()
+    }
+
+    /// 插件源探测没有内部超时，外面统一兜底，避免个别站点拖死整批。
+    private func withTimeout<T: Sendable>(seconds: Double, _ operation: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw ViewerError.message("来源探测超时")
+            }
+            guard let first = try await group.next() else {
+                throw ViewerError.message("来源探测失败")
+            }
+            group.cancelAll()
+            return first
         }
     }
 
@@ -136,6 +190,8 @@ final class AppStore: ObservableObject {
             // 顺序在导入时一次定好，之后不再随探测结果变化。
             rebuildSourceOrder()
             SpiderSource.shared.update(result.spider)
+            // 后台把全部来源探一遍：失败的记 0 分，"只保留可用"会把它们隐藏。
+            Task { await probeAllSources() }
             // 插件解析在后台预热：首屏按需触发，失败只影响单个来源。
             Task.detached { await GuardRuleCatalog.shared.prepare(spider: result.spider) }
         } catch is CancellationError { }

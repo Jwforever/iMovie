@@ -93,7 +93,7 @@ enum DalvikSpider {
     /// 统一放到 16 MB 栈的专用线程里跑，只在这一层转换一次。
     static func execute(dex: Data, shortName: String, action: DalvikSpiderAction,
                         ext: String, control: DalvikExecutionControl = DalvikExecutionControl(),
-                        httpSession: URLSession = .shared, maximumSteps: Int = 20_000_000,
+                        httpSession: URLSession = LiveNetwork.shared.session, maximumSteps: Int = 20_000_000,
                         timeout: TimeInterval = 45) throws -> DalvikRunResult {
         if Thread.current.threadDictionary["imovie.dalvik.stack"] != nil {
             return try runOnCurrentThread(dex: dex, shortName: shortName, action: action,

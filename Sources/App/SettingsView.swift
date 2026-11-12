@@ -36,6 +36,28 @@ import SwiftUI
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            Section("来源可用性") {
+                Toggle("只保留可用的源", isOn: Binding(
+                    get: { store.hideFailedSources },
+                    set: { store.setHideFailedSources($0) }))
+                Button {
+                    Task { await store.probeAllSources() }
+                } label: {
+                    HStack {
+                        Label(store.probingSources ? "正在检测…" : "重新检测所有来源", systemImage: "antenna.radiowaves.left.and.right")
+                        Spacer()
+                        if store.probingSources {
+                            ProgressView()
+                            if let config = store.config {
+                                Text("\(store.health.filter { _, record in record.at > Date().addingTimeInterval(-600) }.count)/\(config.sites.count)")
+                                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }.disabled(store.probingSources)
+                Text("导入配置后自动逐个试拉首页（插件源走设备内解释器），失败的源会被隐藏、能用的排前面。失败可能是站点临时故障，可手动重新检测。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("播放器") {
                 Label("详情页内播放 · AirPlay · 画中画", systemImage: "play.rectangle")
                     .font(.subheadline)

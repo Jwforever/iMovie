@@ -405,17 +405,43 @@ import SwiftUI
     @State private var verifyURL: URL?
     private let client = TVAPIClient()
 
+    /// 详情字段缺失时（不少采集器只回选集），回退到列表页已知信息，
+    /// 避免片名变成线路名（"自动"）或海报丢失。
+    private var shownVideo: Video {
+        guard let detail else { return video }
+        return Video(id: video.id,
+                     title: detail.title.isEmpty ? video.title : detail.title,
+                     poster: detail.poster.isEmpty ? video.poster : detail.poster,
+                     note: detail.note.isEmpty ? video.note : detail.note,
+                     summary: detail.summary.isEmpty ? video.summary : detail.summary,
+                     playFrom: detail.playFrom, playURL: detail.playURL)
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
           ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 Group {
-                    if let selection {
-                        VStack(alignment: .leading, spacing: 12) {
+                    // 海报/片名/简介常驻顶部；选集播放后只把播放器接在信息下面，
+                    // 不再整块替换（此前点选集会把详情和海报"闪没"）。
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .top, spacing: 14) {
+                            PosterView(url: shownVideo.poster).frame(width: 84)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(shownVideo.title).font(.title3.bold()).lineLimit(2)
+                                if !shownVideo.note.isEmpty {
+                                    Text(shownVideo.note).font(.subheadline).foregroundStyle(Theme.accent)
+                                }
+                                Text(site.name).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("detail-introduction")
+                        if let selection {
                             PlaybackSurface(controller: playback)
                             HStack {
                                 VStack(alignment: .leading, spacing: 5) {
-                                    Text("\(video.title) · \(selection.title)").font(.headline)
+                                    Text("\(shownVideo.title) · \(selection.title)").font(.headline)
                                     Text(selectedLine ?? site.name).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
@@ -430,22 +456,12 @@ import SwiftUI
                                 Text(error).font(.subheadline).foregroundStyle(.orange)
                                 Button("重新获取播放链接") { play(selection, line: selectedLine ?? "") }.buttonStyle(.bordered)
                             }
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: 18) {
-                            HStack(alignment: .top, spacing: 18) {
-                                PosterView(url: (detail ?? video).poster).frame(width: 120)
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text((detail ?? video).title).font(.title2.bold())
-                                    Text((detail ?? video).note).font(.subheadline).foregroundStyle(Theme.accent)
-                                    Text(site.name).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                            if !(detail ?? video).summary.isEmpty {
-                                Text((detail ?? video).summary).font(.subheadline).foregroundStyle(.secondary)
+                        } else {
+                            if !shownVideo.summary.isEmpty {
+                                Text(shownVideo.summary).font(.subheadline).foregroundStyle(.secondary)
                             }
                             Text("选择下方剧集开始播放").font(.caption).foregroundStyle(.secondary)
-                        }.accessibilityIdentifier("detail-introduction")
+                        }
                     }
                 }.id("detail-top")
                 if loading { ProgressView("正在加载选集…") }
@@ -524,6 +540,6 @@ import SwiftUI
         selection = episode
         selectedLine = line
         playback.onProgress = { [weak store] in store?.record($0, position: $1) }
-        playback.select(site: site, episode: episode, flag: line, title: "\(video.title) · \(episode.title)", poster: (detail ?? video).poster, resume: { [weak store] in store?.position(for: $0) ?? 0 })
+        playback.select(site: site, episode: episode, flag: line, title: "\(video.title) · \(episode.title)", poster: shownVideo.poster, resume: { [weak store] in store?.position(for: $0) ?? 0 })
     }
 }

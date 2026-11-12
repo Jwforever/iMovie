@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import UniformTypeIdentifiers
 
 @MainActor
 final class PlaybackController: ObservableObject {
@@ -21,7 +22,7 @@ final class PlaybackController: ObservableObject {
     private var generation = UUID()
     private var shouldPlay = false
     private var lastRecordedAt = Date.distantPast
-    private var liveCertificateDelegate: LiveCertificateDelegate?
+    private var liveCertificateDelegate: (NSObject & AVAssetResourceLoaderDelegate)?
 
     init() {
         progressObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] time in
@@ -79,11 +80,23 @@ final class PlaybackController: ObservableObject {
             let url = try HTTPAddress.parse(media.url)
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
-            let asset = AVURLAsset(url: url, options: media.headers.isEmpty ? nil : ["AVURLAssetHTTPHeaderFieldsKey": media.headers])
-            if media.allowsInvalidCertificate == true {
-                let delegate = LiveCertificateDelegate()
-                liveCertificateDelegate = delegate
-                asset.resourceLoader.setDelegate(delegate, queue: .global(qos: .userInitiated))
+            // 采集源大量自签/过期证书。https 一律改走本地代理 scheme，由信任所有
+            // 证书的会话取流，播放器本体不再直接做 TLS 校验。
+            var assetURL = url
+            var bypass: StreamingBypassLoader?
+            if url.scheme?.lowercased() == "https" {
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                components?.scheme = StreamingBypassLoader.scheme
+                if let rewritten = components?.url {
+                    assetURL = rewritten
+                    bypass = StreamingBypassLoader(session: LiveNetwork.shared.session, headers: media.headers)
+                }
+            }
+            let options = (media.headers.isEmpty || bypass != nil) ? nil : ["AVURLAssetHTTPHeaderFieldsKey": media.headers]
+            let asset = AVURLAsset(url: assetURL, options: options)
+            if let bypass {
+                liveCertificateDelegate = bypass
+                asset.resourceLoader.setDelegate(bypass, queue: .global(qos: .userInitiated))
             }
             let item = AVPlayerItem(asset: asset)
             observation = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
@@ -166,11 +179,53 @@ final class PlaybackController: ObservableObject {
     }
 }
 
-private final class LiveCertificateDelegate: NSObject, AVAssetResourceLoaderDelegate {
-    func resourceLoader(_ resourceLoader: AVAssetResourceLoader, shouldWaitForResponseTo authenticationChallenge: URLAuthenticationChallenge) -> Bool {
-        guard authenticationChallenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let trust = authenticationChallenge.protectionSpace.serverTrust else { return false }
-        authenticationChallenge.sender?.use(URLCredential(trust: trust), for: authenticationChallenge)
+/// https 资源改走自定义 scheme，交给信任所有证书的会话取流，绕过站点证书问题。
+final class StreamingBypassLoader: NSObject, AVAssetResourceLoaderDelegate {
+    static let scheme = "imhttps"
+    private let session: URLSession
+    private let headers: [String: String]
+
+    init(session: URLSession, headers: [String: String]) {
+        self.session = session
+        self.headers = headers
+        super.init()
+    }
+
+    func resourceLoader(_ resourceLoader: AVAssetResourceLoader,
+                        shouldWaitForLoadingOfRequest resourceLoadingRequest: AVAssetResourceLoadingRequest) -> Bool {
+        guard let requestURL = resourceLoadingRequest.request.url,
+              requestURL.scheme?.lowercased() == Self.scheme else { return false }
+        var components = URLComponents(url: requestURL, resolvingAgainstBaseURL: false)
+        components?.scheme = "https"
+        guard let original = components?.url else { return false }
+        var request = URLRequest(url: original, timeoutInterval: 30)
+        for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
+        if let range = resourceLoadingRequest.request.value(forHTTPHeaderField: "Range") {
+            request.setValue(range, forHTTPHeaderField: "Range")
+        }
+        session.dataTask(with: request) { [weak resourceLoadingRequest] data, response, error in
+            guard let request = resourceLoadingRequest else { return }
+            if let error {
+                request.finishLoading(with: error)
+                return
+            }
+            guard let http = response as? HTTPURLResponse, let data, (200..<300).contains(http.statusCode) else {
+                request.finishLoading(with: URLError(.badServerResponse))
+                return
+            }
+            if let info = request.contentInformationRequest {
+                info.isByteRangeAccessSupported = true
+                if let mime = http.value(forHTTPHeaderField: "Content-Type"),
+                   let type = UTType(mimeType: mime) {
+                    info.contentType = type.identifier
+                }
+                if http.expectedContentLength > 0 {
+                    info.expectedContentLength = http.expectedContentLength
+                }
+            }
+            request.dataRequest?.respond(with: data)
+            request.finishLoading()
+        }.resume()
         return true
     }
 }

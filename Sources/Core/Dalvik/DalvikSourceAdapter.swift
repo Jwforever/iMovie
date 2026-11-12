@@ -51,15 +51,14 @@ enum CatVodPayload {
     }
 
     /// 详情：插件把整条记录放在 list[0] 里。
+    /// 标题/海报可能缺失（有些采集器只回选集），界面层会用列表页已知信息兜底；
+    /// 这里绝不能拿 vod_play_from（线路名，常是"自动"）冒充片名。
     static func detail(_ raw: String) -> Video? {
         guard let root = dictionary(raw), let items = root["list"] as? [[String: Any]],
               let item = items.first else { return nil }
         let id = text(item["vod_id"])
-        var name = text(item["vod_name"])
-        // 有些采集器的详情只有选集、没有名称，不能因为缺标题就整条丢掉。
-        if name.isEmpty { name = text(item["vod_play_from"]) }
-        if name.isEmpty { name = id }
-        guard !name.isEmpty else { return nil }
+        guard !id.isEmpty else { return nil }
+        let name = text(item["vod_name"])
         let playFrom = text(item["vod_play_from"])
         // `vod_play_url` 必须原样交给插件。不少采集器故意把每集写成
         // `名称${key=value,...}`（Java Map 的 toString），`playerContent` 会自己
