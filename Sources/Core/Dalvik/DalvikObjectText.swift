@@ -19,7 +19,7 @@ extension DalvikNatives {
             }
             if let method = vm.findMethod(object.className, "toString", []) {
                 if let result = try? vm.invoke(method, [], object),
-                   case .ref(let text)? = result, let string = text?.stringPayload {
+                   case .ref(let target) = result, let string = target?.stringPayload {
                     return string
                 }
             }
