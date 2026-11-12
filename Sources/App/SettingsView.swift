@@ -59,9 +59,9 @@ import SwiftUI
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("播放器") {
-                Label("详情页内播放 · AirPlay · 画中画", systemImage: "play.rectangle")
+                Label("mpv 内核 · 硬解 · AirPlay 兼容流", systemImage: "play.rectangle")
                     .font(.subheadline)
-                Text("支持 AVPlayer 可解码的格式，通常包括 HLS、MP4。部分 TS、MKV、网页链接及特殊音视频编码需要额外适配。")
+                Text("播放内核为 mpv + FFmpeg（设备内 VideoToolbox 硬解），支持 HLS、MP4、MKV、TS 及常见音视频编码，忽略站点证书问题，自定义请求头全程透传。点画面可呼出播放控制。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("缓存") {
@@ -125,7 +125,7 @@ import SwiftUI
             }
             Section("软件介绍") {
                 Text("iMovie 是为 iPhone 和 iPad 开发的媒体播放器，支持导入 TVBox 配置、浏览分类、聚合搜索、选集播放、收藏与播放记录。")
-                Text("来源请求与视频链接提取在设备内完成，使用 AVPlayer 播放，无需 Android 设备或自建解析服务。不同来源的可用性取决于网站、网络及适配情况。")
+                Text("来源请求与视频链接提取在设备内完成，播放内核为 mpv（libmpv + FFmpeg），无需 Android 设备或自建解析服务。不同来源的可用性取决于网站、网络及适配情况。")
                     .foregroundStyle(.secondary)
             }
             Section("项目信息") {

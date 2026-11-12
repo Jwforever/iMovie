@@ -22,3 +22,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------------
+mpv / libmpv and FFmpeg (via MPVKit, https://github.com/mpvkit/MPVKit)
+
+Copyright (c) mpv contributors, FFmpeg contributors.
+Licensed under the GNU Lesser General Public License v3.0 (LGPL-3.0).
+The prebuilt libraries are linked dynamically and can be replaced by the user;
+source availability: https://github.com/mpvkit/MPVKit and respective upstream
+projects (https://github.com/mpv-player/mpv, https://ffmpeg.org).

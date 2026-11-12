@@ -1,40 +1,25 @@
 import SwiftUI
-import AVKit
+import AVFAudio
 
 @MainActor
 final class PlaybackController: ObservableObject {
-    let player = AVPlayer()
     @Published var error: String?
     @Published private(set) var isPlaying = false
     @Published private(set) var hasVideoFrame = false
     @Published private(set) var elapsed = 0.0
+    @Published private(set) var duration = 0.0
     @Published private(set) var media: MediaLink?
     @Published private(set) var resolving = false
     let sessionID = UUID().uuidString
     var onProgress: ((MediaLink, Double) -> Void)?
-    private var observation: NSKeyValueObservation?
-    private var timeControlObservation: NSKeyValueObservation?
-    private var failureObserver: NSObjectProtocol?
-    private var resume = 0.0
-    private var progressObserver: Any?
     private var resolutionTask: Task<Void, Never>?
     private var generation = UUID()
-    private var shouldPlay = false
+    private var resume = 0.0
     private var lastRecordedAt = Date.distantPast
-
-    init() {
-        LocalStreamProxy.shared.prepare()
-        progressObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main) { [weak self] time in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.elapsed = time.seconds.isFinite ? max(0, time.seconds) : 0
-                if let media = self.media, Date().timeIntervalSince(self.lastRecordedAt) >= 5 {
-                    self.lastRecordedAt = Date()
-                    self.onProgress?(media, self.position)
-                }
-            }
-        }
-    }
+    private var coreIdle = true
+    private var paused = true
+    /// 由播放视图（MPVMetalViewController）挂上来；视图未就绪前先记 pending。
+    weak var surface: MPVMetalViewController?
 
     func select(site: SourceSite, episode: Episode, flag: String, title: String, poster: String = "", resume: @escaping (MediaLink) -> Double) {
         beginResolution {
@@ -45,7 +30,7 @@ final class PlaybackController: ObservableObject {
     }
 
     func prepare(_ source: MediaLink, resume: Double, force: Bool = false) {
-        guard force || media?.id != source.id || player.currentItem == nil else { return }
+        guard force || media?.id != source.id || surface?.mpv == nil else { return }
         beginResolution { (try await MediaResolver().resolve(source), resume) }
     }
 
@@ -70,71 +55,77 @@ final class PlaybackController: ObservableObject {
     }
 
     func open(_ media: MediaLink, resume: Double) {
-        clearItem()
+        clearPlaybackState()
         error = nil
         self.resume = resume
         self.media = media
-        shouldPlay = true
         do {
             let url = try HTTPAddress.parse(media.url)
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
-            // https 一律走本地回环代理（真实端口 + m3u8 重写），证书问题在代理层消化；
-            // 代理未就绪或非 https 时退回原生直连。
-            var assetURL = url
-            var options = media.headers.isEmpty ? nil : ["AVURLAssetHTTPHeaderFieldsKey": media.headers]
-            if let proxied = LocalStreamProxy.shared.mediaURL(for: url, headers: media.headers) {
-                assetURL = proxied
-                options = nil
-            }
-            let asset = AVURLAsset(url: assetURL, options: options)
-            let item = AVPlayerItem(asset: asset)
-            observation = item.observe(\.status, options: [.new, .initial]) { [weak self] item, _ in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    guard self.player.currentItem === item else { return }
-                    switch item.status {
-                    case .readyToPlay:
-                        let duration = item.duration.seconds
-                        if self.resume > 3, duration.isFinite, self.resume < duration - 3 {
-                            self.player.seek(to: CMTime(seconds: self.resume, preferredTimescale: 600))
-                        }
-                        self.resume = 0
-                        self.player.play()
-                    case .failed:
-                        self.error = item.error?.localizedDescription ?? "媒体无法播放。请检查地址、网络和编码格式。"
-                    default: break
-                    }
-                }
-            }
-            failureObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { [weak self] notification in
-                let message = (notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)?.localizedDescription ?? "播放中断，请重试或切换来源。"
-                Task { @MainActor [weak self] in self?.error = message }
-            }
-            player.replaceCurrentItem(with: item)
-            player.allowsExternalPlayback = true
-            onProgress?(media, resume)
+            // mpv 直接播原始地址：tls-verify=no 免证书校验，头信息走 per-file option。
+            let start = self.resume
+            self.resume = 0
+            surface?.load(url: url.absoluteString, headers: media.headers, start: start)
+            onProgress?(media, position)
             lastRecordedAt = Date()
-            timeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] _, _ in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    self.isPlaying = self.player.timeControlStatus == .playing
-                }
-            }
         } catch { self.error = error.localizedDescription }
+    }
+
+    /// 播放视图就绪后回填：把挂起的内容交给 mpv。
+    func attach(_ surface: MPVMetalViewController) {
+        self.surface = surface
+        guard let media else { return }
+        let start = resume
+        resume = 0
+        let url = (try? HTTPAddress.parse(media.url))?.absoluteString ?? media.url
+        surface.load(url: url, headers: media.headers, start: start)
+    }
+
+    // MARK: - mpv 事件（主线程）
+
+    func updateElapsed(_ value: Double) {
+        elapsed = value.isFinite ? max(0, value) : 0
+        if let media, Date().timeIntervalSince(lastRecordedAt) >= 5 {
+            lastRecordedAt = Date()
+            onProgress?(media, position)
+        }
+    }
+
+    func updateDuration(_ value: Double) {
+        duration = value.isFinite ? max(0, value) : 0
+    }
+
+    func updatePaused(_ value: Bool) {
+        paused = value
+        isPlaying = !paused && !coreIdle
+    }
+
+    func updateCoreIdle(_ value: Bool) {
+        coreIdle = value
+        isPlaying = !paused && !coreIdle
+    }
+
+    func ended(_ message: String?) {
+        if let message {
+            error = "播放中断：\(message)。可重试或更换线路。"
+        } else if let media {
+            onProgress?(media, 0)
+        }
     }
 
     func rendered(_ ready: Bool) { hasVideoFrame = ready }
 
-    func resumeAfterTransition(wasPlaying: Bool) {
-        guard wasPlaying, shouldPlay, player.currentItem?.status == .readyToPlay else { return }
-        player.play()
-    }
+    // MARK: - 控制
+
+    func playPause() { surface?.playPause() }
+    func seek(to seconds: Double) { surface?.seek(to: seconds) }
 
     var position: Double {
-        guard let duration = player.currentItem?.duration.seconds, duration.isFinite else { return 0 }
-        let current = player.currentTime().seconds
-        return current.isFinite && current < duration - 3 ? current : 0
+        if duration > 0 {
+            return elapsed.isFinite && elapsed < duration - 3 ? elapsed : 0
+        }
+        return elapsed.isFinite ? elapsed : 0
     }
 
     func stop() {
@@ -142,111 +133,57 @@ final class PlaybackController: ObservableObject {
         resolutionTask?.cancel()
         resolutionTask = nil
         resolving = false
-        shouldPlay = false
         if let media { onProgress?(media, position) }
-        clearItem()
+        surface?.stopPlayback()
+        clearPlaybackState()
         media = nil
     }
 
-    private func clearItem() {
-        observation = nil
-        timeControlObservation = nil
+    private func clearPlaybackState() {
         isPlaying = false
         hasVideoFrame = false
         elapsed = 0
-        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
-        failureObserver = nil
-        player.pause()
-        player.replaceCurrentItem(with: nil)
+        duration = 0
+        coreIdle = true
+        paused = true
     }
 
     deinit {
         resolutionTask?.cancel()
-        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
-        if let progressObserver { player.removeTimeObserver(progressObserver) }
-        player.pause()
     }
 }
 
+/// mpv Metal 渲染视图接入 SwiftUI。
 @MainActor struct NativeVideoPlayer: UIViewControllerRepresentable {
     @ObservedObject var playback: PlaybackController
 
-    func makeCoordinator() -> Coordinator { Coordinator(playback: playback) }
-
-    func makeUIViewController(context: Context) -> PlayerContainerViewController {
-        let container = PlayerContainerViewController()
-        container.playback = playback
-        let controller = container.videoController
-        controller.player = playback.player
-        controller.allowsPictureInPicturePlayback = true
-        controller.canStartPictureInPictureAutomaticallyFromInline = true
-        controller.entersFullScreenWhenPlaybackBegins = false
-        controller.showsPlaybackControls = true
-        controller.speeds = []
-        controller.delegate = context.coordinator
-        context.coordinator.observation = controller.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak playback] controller, _ in
-            let ready = controller.isReadyForDisplay
-            Task { @MainActor in playback?.rendered(ready) }
-        }
-        return container
+    func makeUIViewController(context: Context) -> MPVMetalViewController {
+        let controller = MPVMetalViewController()
+        controller.playback = playback
+        playback.attach(controller)
+        return controller
     }
 
-    func updateUIViewController(_ container: PlayerContainerViewController, context: Context) {
-        let controller = container.videoController
-        if controller.player !== playback.player { controller.player = playback.player }
-    }
-
-    @MainActor final class Coordinator: NSObject, @preconcurrency AVPlayerViewControllerDelegate {
-        weak var playback: PlaybackController?
-        var observation: NSKeyValueObservation?
-        init(playback: PlaybackController) { self.playback = playback }
-
-        func playerViewController(_ playerViewController: AVPlayerViewController, willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
-            let playing = playback?.isPlaying == true
-            coordinator.animate(alongsideTransition: nil) { [weak self] _ in
-                Task { @MainActor in self?.playback?.resumeAfterTransition(wasPlaying: playing) }
-            }
-        }
-    }
-}
-
-/// AVPlayerViewController is embedded as a child; Apple does not support subclassing it.
-@MainActor final class PlayerContainerViewController: UIViewController {
-    weak var playback: PlaybackController?
-    let videoController = AVPlayerViewController()
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .black
-        addChild(videoController)
-        videoController.view.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(videoController.view)
-        NSLayoutConstraint.activate([
-            videoController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            videoController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            videoController.view.topAnchor.constraint(equalTo: view.topAnchor),
-            videoController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-        videoController.didMove(toParent: self)
-    }
-
-    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
-        let playing = playback?.isPlaying == true
-        super.viewWillTransition(to: size, with: coordinator)
-        coordinator.animate(alongsideTransition: nil) { [weak self] _ in
-            self?.view.setNeedsLayout()
-            Task { @MainActor in self?.playback?.resumeAfterTransition(wasPlaying: playing) }
-        }
+    func updateUIViewController(_ controller: MPVMetalViewController, context: Context) {
+        controller.playback = playback
     }
 }
 
 @MainActor struct PlaybackSurface: View {
     @ObservedObject var controller: PlaybackController
     var fills = false
+    @State private var showControls = false
+    @State private var seeking = false
+    @State private var seekValue: Double = 0
 
     var body: some View {
         NativeVideoPlayer(playback: controller)
             .modifier(PlaybackSurfaceStyle(fills: fills))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+            }
+            .overlay { controls }
             .accessibilityIdentifier("native-player")
             .accessibilityValue(controller.isPlaying ? "playing" : "waiting")
             .overlay(alignment: .bottomLeading) {
@@ -256,6 +193,40 @@ final class PlaybackController: ObservableObject {
                     .accessibilityIdentifier("playback-session")
                     .allowsHitTesting(false)
             }
+    }
+
+    @ViewBuilder private var controls: some View {
+        if showControls {
+            VStack {
+                Spacer()
+                HStack(spacing: 12) {
+                    Button { controller.playPause() } label: {
+                        Image(systemName: controller.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.title2)
+                    }
+                    if controller.duration > 0 {
+                        Text(Self.timeString(controller.elapsed))
+                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        Slider(value: Binding(
+                            get: { seeking ? seekValue : min(controller.elapsed, max(controller.duration, 0.1)) },
+                            set: { seekValue = $0 }), in: 0...max(controller.duration, 0.1)) { editing in
+                            seeking = editing
+                            if !editing { controller.seek(to: seekValue) }
+                        }
+                        Text(Self.timeString(controller.duration))
+                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(12)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .padding(12)
+            }
+        }
+    }
+
+    private static func timeString(_ seconds: Double) -> String {
+        let total = Int(max(0, seconds))
+        return String(format: "%02d:%02d", total / 60, total % 60)
     }
 }
 
@@ -332,7 +303,7 @@ private struct PlaybackSurfaceStyle: ViewModifier {
                 Button("重新连接") { controller.prepare(media, resume: controller.position, force: true) }
                     .buttonStyle(.bordered)
             }
-            Text("点开播放器控件可全屏；横过来画面会自动铺满。")
+            Text("点画面显示播放控制；横过来画面会自动铺满。")
                 .font(.caption).foregroundStyle(.white.opacity(0.5))
         }
     }
