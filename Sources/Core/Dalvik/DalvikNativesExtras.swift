@@ -313,16 +313,20 @@ extension DalvikNatives {
             return .ref(this)
         }
         vm.register("Lokhttp3/Request$Builder;", "post") { _, this, args in
-            (this?.payload as? RequestBox)?.method = "POST"
-            if let body = args.first?.asObject?.payload as? Data {
-                (this?.payload as? RequestBox)?.body = body
+            let box = this?.payload as? RequestBox
+            box?.method = "POST"
+            if let body = args.first?.asObject {
+                if let data = body.payload as? Data { box?.body = data }
+                box?.contentType = contentType(of: body)
             }
             return .ref(this)
         }
         vm.register("Lokhttp3/Request$Builder;", "method") { _, this, args in
-            (this?.payload as? RequestBox)?.method = text(args.first)
-            if args.count > 1, let body = args[1].asObject?.payload as? Data {
-                (this?.payload as? RequestBox)?.body = body
+            let box = this?.payload as? RequestBox
+            box?.method = text(args.first)
+            if args.count > 1, let body = args[1].asObject {
+                if let data = body.payload as? Data { box?.body = data }
+                box?.contentType = contentType(of: body)
             }
             return .ref(this)
         }
@@ -368,9 +372,31 @@ extension DalvikNatives {
             .int(Int32(((this?.payload as? Data) ?? Data()).count))
         }
         vm.register("Lokhttp3/ResponseBody;", "close") { _, _, _ in .ref(nil) }
-        vm.register("Lokhttp3/RequestBody;", "create") { _, _, args in
+        vm.register("Lokhttp3/RequestBody;", "create") { vm, _, args in
+            // 老版 okhttp3 是 create(MediaType, String)，新版是 create(String, MediaType)。
+            // 借调用点的形参描述符判断哪个是 MIME、哪个是正文，别靠猜字符串长度。
+            let parameters = vm.invocationParameters
+            var media: String?
+            var content = ""
+            var sawMediaType = false
+            for (index, arg) in args.enumerated() {
+                let descriptor = index < parameters.count ? parameters[index] : ""
+                if descriptor.contains("MediaType") {
+                    media = text(arg)
+                    sawMediaType = true
+                } else {
+                    content = text(arg)
+                }
+            }
+            if !sawMediaType, args.count > 1 {
+                // 没有描述符信息时，把看起来像 MIME 的短串当媒体类型。
+                let candidates = args.map { text($0) }
+                media = candidates.first { $0.contains("/") && $0.count < 80 }
+                content = candidates.first { $0 != media } ?? content
+            }
             let body = DalvikObject(className: "Lokhttp3/RequestBody;")
-            body.payload = Data((text(args.last)).utf8)
+            body.payload = Data(content.utf8)
+            if let media, !media.isEmpty { body.fields["contentType"] = .ref(DalvikObject.string(media)) }
             return .ref(body)
         }
         vm.register("Lokhttp3/FormBody$Builder;", "<init>") { _, this, _ in
@@ -388,6 +414,9 @@ extension DalvikNatives {
             let body = pairs.map { "\(escape($0.0))=\(escape($0.1))" }.joined(separator: "&")
             let object = DalvikObject(className: "Lokhttp3/RequestBody;")
             object.payload = Data(body.utf8)
+            // okhttp3 的 FormBody 会自动带这个头；PHP 的 $_POST 依赖它，
+            // 少了就会当成空表单，插件拿不到任何字段。
+            object.fields["contentType"] = .ref(DalvikObject.string("application/x-www-form-urlencoded"))
             return .ref(object)
         }
         vm.register("Lokhttp3/MediaType;", "parse") { _, _, args in
@@ -399,6 +428,13 @@ extension DalvikNatives {
         vm.register("Ljava/net/URLDecoder;", "decode") { _, _, args in
             .ref(DalvikObject.string(text(args.first).removingPercentEncoding ?? text(args.first)))
         }
+    }
+
+    /// RequestBody 把 MIME 记在 fields 里，payload 留给真正的字节。
+    static func contentType(of body: DalvikObject?) -> String? {
+        guard let value = body?.fields["contentType"] else { return nil }
+        let name = string(value) ?? ""
+        return name.isEmpty ? nil : name
     }
 
     static func escape(_ value: String) -> String {
@@ -434,6 +470,10 @@ extension DalvikNatives {
         mutable.httpMethod = request.method
         for (key, value) in request.headers { mutable.setValue(value, forHTTPHeaderField: key) }
         if let body = request.body { mutable.httpBody = body }
+        if mutable.value(forHTTPHeaderField: "Content-Type") == nil,
+           let type = request.contentType, request.body != nil {
+            mutable.setValue(type, forHTTPHeaderField: "Content-Type")
+        }
         if mutable.value(forHTTPHeaderField: "User-Agent") == nil {
             mutable.setValue(BrowserProfile.userAgent, forHTTPHeaderField: "User-Agent")
         }
@@ -471,7 +511,9 @@ extension DalvikNatives {
         while semaphore.wait(timeout: .now() + 0.05) == .timedOut { try vm.checkExecution() }
         try vm.checkExecution()
         let result = try box.get()
-        vm.log(request.url, result.code)
+        vm.log(request.url, result.code, method: request.method,
+               bodyBytes: request.body?.count ?? 0,
+               contentType: mutable.value(forHTTPHeaderField: "Content-Type") ?? "")
         return result
     }
 
@@ -480,11 +522,14 @@ extension DalvikNatives {
         var headers: [String: String]
         var method: String
         var body: Data?
-        init(url: String, headers: [String: String], method: String, body: Data?) {
+        var contentType: String?
+        init(url: String, headers: [String: String], method: String, body: Data?,
+             contentType: String? = nil) {
             self.url = url
             self.headers = headers
             self.method = method
             self.body = body
+            self.contentType = contentType
         }
     }
 

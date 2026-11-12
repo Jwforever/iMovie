@@ -50,22 +50,6 @@ enum CatVodPayload {
                          page: max(1, page), pageCount: pageCount)
     }
 
-    /// 少数采集器把每集写成 `名称${playUrl=..., play_id=...}`（Java Map 的 toString），
-    /// 需要在交给播放器前取出真正的地址。
-    static func normalizePlayURL(_ raw: String) -> String {
-        guard raw.contains("playUrl=") else { return raw }
-        return raw.components(separatedBy: "#").map { entry -> String in
-            let parts = entry.components(separatedBy: "$")
-            guard parts.count >= 2, parts[1].hasPrefix("{") else { return entry }
-            let body = parts[1]
-            guard let range = body.range(of: "playUrl=") else { return entry }
-            let rest = body[range.upperBound...]
-            let value = rest.prefix { $0 != "," && $0 != "}" }.trimmingCharacters(in: .whitespaces)
-            guard !value.isEmpty else { return entry }
-            return parts[0] + "$" + value
-        }.joined(separator: "#")
-    }
-
     /// 详情：插件把整条记录放在 list[0] 里。
     static func detail(_ raw: String) -> Video? {
         guard let root = dictionary(raw), let items = root["list"] as? [[String: Any]],
@@ -77,7 +61,11 @@ enum CatVodPayload {
         if name.isEmpty { name = id }
         guard !name.isEmpty else { return nil }
         let playFrom = text(item["vod_play_from"])
-        var playURL = normalizePlayURL(text(item["vod_play_url"]))
+        // `vod_play_url` 必须原样交给插件。不少采集器故意把每集写成
+        // `名称${key=value,...}`（Java Map 的 toString），`playerContent` 会自己
+        // 把它反解回 Map；这里一旦"帮忙"提取成裸 URL，插件就取不到 play_id、
+        // userlink 等签名参数，只能发出 p=null&v= 被站点拒绝。
+        var playURL = text(item["vod_play_url"])
         // 有些插件用 vod_play_list / vod_play_url_list 这种成对数组。
         if playURL.isEmpty, let list = item["vod_play_url_list"] as? [Any] {
             playURL = list.map { text($0) }.joined(separator: "$$$")
@@ -173,14 +161,30 @@ struct DalvikSourceAdapter {
     }
 
     func resolve(episode: Episode, flag: String, title: String) async throws -> MediaLink {
-        let result = try await DalvikSpider.run(spider: spider, api: site.api,
-                                                action: .player(flag: flag, id: episode.value),
-                                                ext: site.extensionValue)
-        guard let playback = CatVodPayload.playback(result.json) else {
-            let keys = CatVodPayload.keys(in: result.json).joined(separator: ",")
-            throw ViewerError.message("\(site.name)：插件没有解出播放地址（返回字段：\(keys.isEmpty ? "空" : keys)）")
+        // CatVod 生态里 `playerContent` 的 id 有两种约定：只给 `$` 后面的值，
+        // 或给整条 `名称$值`。两种都是协议内形态，谁解出地址就用谁；不做站点判断。
+        let candidates = [episode.value, "\(episode.title)$\(episode.value)"]
+        var lastOutput = ""
+        var lastError: Error?
+        for identifier in candidates {
+            let result: DalvikRunResult
+            do {
+                result = try await DalvikSpider.run(spider: spider, api: site.api,
+                                                    action: .player(flag: flag, id: identifier),
+                                                    ext: site.extensionValue)
+            } catch {
+                lastError = error
+                continue
+            }
+            lastOutput = result.json
+            if let playback = CatVodPayload.playback(result.json) {
+                return MediaLink(title: title, url: playback.url, headers: playback.headers,
+                                 group: site.name, kind: playback.needsParsing ? .web : .direct)
+            }
         }
-        return MediaLink(title: title, url: playback.url, headers: playback.headers,
-                         group: site.name, kind: playback.needsParsing ? .web : .direct)
+        let keys = CatVodPayload.keys(in: lastOutput).joined(separator: ",")
+        let suffix = keys.isEmpty ? "空" : keys
+        if let lastError { throw ViewerError.message("\(site.name)：插件调用失败（\(lastError.localizedDescription)）") }
+        throw ViewerError.message("\(site.name)：插件没有解出播放地址（返回字段：\(suffix)）")
     }
 }

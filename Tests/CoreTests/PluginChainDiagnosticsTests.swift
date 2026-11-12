@@ -57,21 +57,53 @@ final class PluginChainDiagnosticsTests: XCTestCase {
                 stages.append(Stage(name: "detail", ok: !lines.isEmpty,
                                     detail: "《\(video?.title ?? "?")》线路 \(lines.count) / 集数 \(lines.map(\.episodes.count).reduce(0, +)) / 输出 \(detailRun.json.count) 字节"))
                 report["detailRaw"] = String(detailRun.json.prefix(400))
-                report["detailRequests"] = detailRun.requests.map { ["url": $0.url, "code": $0.code] }
+                report["detailRequests"] = detailRun.requestTrace.map {
+                    ["url": $0.url, "code": $0.code, "method": $0.method,
+                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType] as [String: Any]
+                }
                 guard let line = lines.first, let episode = line.episodes.first else {
                     throw ViewerError.message("详情里没有选集")
                 }
 
-                // 3. 播放
-                let playRun = try await DalvikSpider.run(spider: config.spider, api: site.api,
-                                                         action: .player(flag: line.name, id: episode.value),
+                // 3. 播放。CatVod 有两种传法：只给 `$` 后面的值，或整条 `名称$值`。
+                // 两种都是协议内的合法形态，依次试，谁解出地址就用谁。
+                report["episodeValue"] = String(episode.value.prefix(300))
+                report["flag"] = line.name
+                let candidates = [("value", episode.value),
+                                  ("entry", "\(episode.title)$\(episode.value)")]
+                var attempts: [[String: Any]] = []
+                var chosen: DalvikRunResult?
+                var chosenPlayback: (url: String, headers: [String: String], needsParsing: Bool)?
+                for (label, identifier) in candidates {
+                    let run = try await DalvikSpider.run(spider: config.spider, api: site.api,
+                                                         action: .player(flag: line.name, id: identifier),
                                                          ext: site.extensionValue)
-                notes += playRun.notes.map { ["stage": "player", "note": $0] }
-                let playback = CatVodPayload.playback(playRun.json)
+                    let playback = CatVodPayload.playback(run.json)
+                    attempts.append([
+                        "variant": label, "id": String(identifier.prefix(300)),
+                        "json": String(run.json.prefix(400)),
+                        "requests": run.requestTrace.map {
+                            ["url": $0.url, "code": $0.code, "method": $0.method,
+                             "bodyBytes": $0.bodyBytes, "contentType": $0.contentType] as [String: Any]
+                        }
+                    ] as [String: Any])
+                    notes += run.notes.map { ["stage": "player", "note": $0] }
+                    if chosen == nil { chosen = run }
+                    if playback?.url.hasPrefix("http") == true {
+                        chosen = run; chosenPlayback = playback
+                        break
+                    }
+                }
+                let playRun = chosen!
+                let playback = chosenPlayback ?? CatVodPayload.playback(playRun.json)
+                report["playAttempts"] = attempts
                 stages.append(Stage(name: "player", ok: playback?.url.hasPrefix("http") == true,
                                     detail: "字段 \(CatVodPayload.keys(in: playRun.json).joined(separator: ",")) / \(playback?.url.prefix(110) ?? playRun.json.prefix(120))"))
                 report["playRaw"] = String(playRun.json.prefix(400))
-                report["playRequests"] = playRun.requests.map { ["url": $0.url, "code": $0.code] }
+                report["playRequests"] = playRun.requestTrace.map {
+                    ["url": $0.url, "code": $0.code, "method": $0.method,
+                     "bodyBytes": $0.bodyBytes, "contentType": $0.contentType] as [String: Any]
+                }
             } catch {
                 stages.append(Stage(name: "error", ok: false, detail: error.localizedDescription))
                 report["error"] = error.localizedDescription

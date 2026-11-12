@@ -29,6 +29,7 @@ struct DalvikRunResult {
     var method: String
     var json: String
     var requests: [(url: String, code: Int)]
+    var requestTrace: [(url: String, code: Int, method: String, bodyBytes: Int, contentType: String)] = []
     var steps: Int
     var seconds: Double
     var notes: [String] = []
@@ -217,6 +218,7 @@ enum DalvikSpider {
                                method: action.methodName,
                                json: json,
                                requests: vm.httpLog,
+                               requestTrace: vm.httpTrace,
                                steps: vm.stepCount,
                                seconds: Date().timeIntervalSince(started),
                                notes: vm.notes)

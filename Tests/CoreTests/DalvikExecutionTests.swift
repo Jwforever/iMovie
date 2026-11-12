@@ -181,6 +181,58 @@ final class DalvikExecutionTests: XCTestCase {
         XCTAssertEqual(vm.httpLog.first?.url, "https://plugin.test/home")
     }
 
+    func testFormBodyPostCarriesContentTypeAndFields() throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [DalvikHTTPFixture.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        DalvikHTTPFixture.lastRequest = nil
+        let (vm, _) = try machine([0x000E], session: session)
+
+        let builder = DalvikObject(className: "Lokhttp3/FormBody$Builder;")
+        let initForm = try XCTUnwrap(vm.nativeBody("Lokhttp3/FormBody$Builder;", "<init>"))
+        _ = try initForm(vm, builder, [])
+        let add = try XCTUnwrap(vm.nativeBody("Lokhttp3/FormBody$Builder;", "add"))
+        _ = try add(vm, builder, [.ref(DalvikObject.string("id")), .ref(DalvikObject.string("abc"))])
+        _ = try add(vm, builder, [.ref(DalvikObject.string("type")), .ref(DalvikObject.string("music"))])
+        let buildForm = try XCTUnwrap(vm.nativeBody("Lokhttp3/FormBody$Builder;", "build"))
+        let body = try XCTUnwrap(buildForm(vm, builder, []).asObject)
+
+        let requestBuilder = DalvikObject(className: "Lokhttp3/Request$Builder;")
+        let initRequest = try XCTUnwrap(vm.nativeBody("Lokhttp3/Request$Builder;", "<init>"))
+        _ = try initRequest(vm, requestBuilder, [])
+        let url = try XCTUnwrap(vm.nativeBody("Lokhttp3/Request$Builder;", "url"))
+        _ = try url(vm, requestBuilder, [.ref(DalvikObject.string("https://plugin.test/play.php"))])
+        let post = try XCTUnwrap(vm.nativeBody("Lokhttp3/Request$Builder;", "post"))
+        _ = try post(vm, requestBuilder, [.ref(body)])
+        let buildRequest = try XCTUnwrap(vm.nativeBody("Lokhttp3/Request$Builder;", "build"))
+        let request = try XCTUnwrap(buildRequest(vm, requestBuilder, []).asObject)
+        let newCall = try XCTUnwrap(vm.nativeBody("Lokhttp3/OkHttpClient;", "newCall"))
+        let call = try XCTUnwrap(newCall(vm, nil, [.ref(request)]).asObject)
+        let execute = try XCTUnwrap(vm.nativeBody("Lokhttp3/Call;", "execute"))
+        _ = try execute(vm, call, [])
+
+        XCTAssertEqual(DalvikHTTPFixture.lastRequest?.httpMethod, "POST")
+        XCTAssertEqual(DalvikHTTPFixture.lastRequest?.value(forHTTPHeaderField: "Content-Type"),
+                       "application/x-www-form-urlencoded")
+        XCTAssertEqual(String(data: DalvikHTTPFixture.lastRequest?.httpBody ?? Data(), encoding: .utf8),
+                       "id=abc&type=music")
+        XCTAssertEqual(vm.httpTrace.first?.contentType, "application/x-www-form-urlencoded")
+        XCTAssertEqual(vm.httpTrace.first?.bodyBytes, 17)
+    }
+
+    func testDetailPassesPluginEpisodeValueThroughUnchanged() throws {
+        // 插件自己会把 `{playUrl=..., play_id=...}` 反解成 Map；应用不能替它"提取" URL。
+        let raw = """
+        {"list":[{"vod_id":"play/ch4rws7bw","vod_name":"谷雨","vod_play_from":"自动",\
+        "vod_play_url":"1${playUrl=play/ch4rws7bw, play_id=41822, userlink=ABC}#2${playUrl=play/x, play_id=41823, userlink=ABC}"}]}
+        """
+        let video = try XCTUnwrap(CatVodPayload.detail(raw))
+        XCTAssertEqual(video.lines.first?.episodes.first?.value,
+                       "{playUrl=play/ch4rws7bw, play_id=41822, userlink=ABC}")
+        XCTAssertEqual(video.lines.first?.episodes.count, 2)
+    }
+
     func testCancellationStopsPendingHttpRequest() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [DalvikHTTPFixture.self]
@@ -225,9 +277,11 @@ final class DalvikExecutionTests: XCTestCase {
 }
 
 private final class DalvikHTTPFixture: URLProtocol {
+    static var lastRequest: URLRequest?
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "plugin.test" }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
+        DalvikHTTPFixture.lastRequest = request
         if request.url?.path == "/slow" { return }
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: [:])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
