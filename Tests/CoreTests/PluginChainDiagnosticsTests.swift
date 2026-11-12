@@ -4,9 +4,9 @@ import XCTest
 
 /// 端到端链路自测：首页 → 详情 → 选集 → 播放地址。
 ///
-/// 只挑几个已知能出内容的采集器，逐段断言"上一步的产物能喂给下一步"，
-/// 并把每一段的实际请求和结果写进 `dist/plugin-chain-report.json`。
-/// 默认不跑（会打真实站点），由 CI 用 `IMOVIE_CHAIN_DIAGNOSTICS=1` 触发。
+/// 直接调解释器而不是走适配器，这样每一段都能拿到 `notes`
+/// （插件内部 try/catch 吞掉的异常、缺实现的方法），失败原因才看得见。
+/// 默认跳过，CI 用 `IMOVIE_CHAIN_DIAGNOSTICS=1` 触发。
 final class PluginChainDiagnosticsTests: XCTestCase {
     private struct Stage {
         var name: String
@@ -19,64 +19,67 @@ final class PluginChainDiagnosticsTests: XCTestCase {
         guard environment["IMOVIE_CHAIN_DIAGNOSTICS"] == "1" else {
             throw XCTSkip("默认跳过：需要 IMOVIE_CHAIN_DIAGNOSTICS=1")
         }
-        let keys = Set((environment["IMOVIE_CHAIN_KEYS"] ?? "YGP,MTV1")
+        let keys = Set((environment["IMOVIE_CHAIN_KEYS"] ?? "")
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty })
 
         let config = try await HTTPClient().config(at: "http://www.饭太硬.cc/tv")
-        // 采集器执行时要靠这个拿到插件包地址；应用里由 AppStore 在导入时写入。
         SpiderSource.shared.update(config.spider)
-        let selected = config.sites.filter { $0.isPlugin && keys.contains($0.key) }
+        let selected = config.sites.filter { $0.isPlugin && (keys.isEmpty || keys.contains($0.key)) }
         XCTAssertFalse(selected.isEmpty, "没有匹配到要测的来源")
 
         var reports: [[String: Any]] = []
         for site in selected {
             var report: [String: Any] = ["key": site.key, "name": site.name, "api": site.api]
             var stages: [Stage] = []
+            var notes: [[String: String]] = []
+
             do {
                 // 1. 首页
-                let home = try await DalvikSourceAdapter(site: site)
-                    .page(category: nil, search: nil, page: 1)
-                stages.append(Stage(name: "home", ok: !home.videos.isEmpty,
-                                    detail: "分类 \(home.categories.count) / 影片 \(home.videos.count)"))
-                report["categories"] = home.categories.prefix(5).map { ["id": $0.id, "name": $0.name] }
-                report["homeVideos"] = home.videos.prefix(5).map { ["id": $0.id, "title": $0.title] }
-
-                guard let first = home.videos.first else {
-                    throw ViewerError.message("首页没有影片")
-                }
+                let homeRun = try await DalvikSpider.run(spider: config.spider, api: site.api,
+                                                         action: .home, ext: site.extensionValue)
+                notes += homeRun.notes.map { ["stage": "home", "note": $0] }
+                let home = CatVodPayload.page(homeRun.json)
+                let videos = home?.videos ?? []
+                stages.append(Stage(name: "home", ok: !videos.isEmpty,
+                                    detail: "分类 \(home?.categories.count ?? 0) / 影片 \(videos.count) / 输出 \(homeRun.json.count) 字节"))
+                report["homeRaw"] = String(homeRun.json.prefix(400))
+                guard let first = videos.first else { throw ViewerError.message("首页没有影片") }
 
                 // 2. 详情
-                let detail = try await DalvikSourceAdapter(site: site).detail(id: first.id)
-                let lines = detail.lines
+                let detailRun = try await DalvikSpider.run(spider: config.spider, api: site.api,
+                                                           action: .detail(id: first.id),
+                                                           ext: site.extensionValue)
+                notes += detailRun.notes.map { ["stage": "detail", "note": $0] }
+                let video = CatVodPayload.detail(detailRun.json)
+                let lines = video?.lines ?? []
                 stages.append(Stage(name: "detail", ok: !lines.isEmpty,
-                                    detail: "《\(detail.title)》线路 \(lines.count) / 集数 \(lines.map(\.episodes.count).reduce(0, +))"))
-                report["detailTitle"] = detail.title
-                report["playFrom"] = detail.playFrom
-                report["episodes"] = lines.first?.episodes.prefix(3).map { ["title": $0.title, "value": $0.value] }
-
+                                    detail: "《\(video?.title ?? "?")》线路 \(lines.count) / 集数 \(lines.map(\.episodes.count).reduce(0, +)) / 输出 \(detailRun.json.count) 字节"))
+                report["detailRaw"] = String(detailRun.json.prefix(400))
                 guard let line = lines.first, let episode = line.episodes.first else {
                     throw ViewerError.message("详情里没有选集")
                 }
 
-                // 3. 播放地址
-                let media = try await DalvikSourceAdapter(site: site)
-                    .resolve(episode: episode, flag: line.name, title: detail.title)
-                let playable = media.url.hasPrefix("http")
-                stages.append(Stage(name: "player", ok: playable,
-                                    detail: "\(media.kind == .web ? "需要解析" : "直链") \(media.url.prefix(110))"))
-                report["mediaURL"] = media.url
-                report["mediaKind"] = media.kind?.rawValue ?? "direct"
-                report["mediaHeaders"] = media.headers
+                // 3. 播放
+                let playRun = try await DalvikSpider.run(spider: config.spider, api: site.api,
+                                                         action: .player(flag: line.name, id: episode.value),
+                                                         ext: site.extensionValue)
+                notes += playRun.notes.map { ["stage": "player", "note": $0] }
+                let playback = CatVodPayload.playback(playRun.json)
+                stages.append(Stage(name: "player", ok: playback?.url.hasPrefix("http") == true,
+                                    detail: "字段 \(CatVodPayload.keys(in: playRun.json).joined(separator: ",")) / \(playback?.url.prefix(110) ?? playRun.json.prefix(120))"))
+                report["playRaw"] = String(playRun.json.prefix(400))
             } catch {
                 stages.append(Stage(name: "error", ok: false, detail: error.localizedDescription))
                 report["error"] = error.localizedDescription
             }
             report["stages"] = stages.map { ["name": $0.name, "ok": $0.ok, "detail": $0.detail] }
+            report["notes"] = notes
             report["passed"] = stages.allSatisfy(\.ok) && !stages.isEmpty
             reports.append(report)
-            print("CHAIN \(site.key) -> " + stages.map { "\($0.name):\($0.ok ? "ok" : "fail")" }.joined(separator: " "))
+            print("CHAIN \(site.key) " + stages.map { "\($0.name):\($0.ok ? "ok" : "fail")" }.joined(separator: " "))
+            for note in notes.prefix(6) { print("   NOTE \(note["stage"] ?? "") \(note["note"] ?? "")") }
         }
 
         let destination = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)

@@ -29,10 +29,13 @@ struct DalvikRunResult {
     var requests: [(url: String, code: Int)]
     var steps: Int
     var seconds: Double
+    var notes: [String] = []
 
     var summary: String {
         let codes = requests.map { "\($0.code)" }.joined(separator: ",")
-        return "\(method) · \(steps) 步 · \(String(format: "%.1f", seconds))s · 请求 \(requests.count) 次 [\(codes)]"
+        var summary = "\(method) · \(steps) 步 · \(String(format: "%.1f", seconds))s · 请求 \(requests.count) 次 [\(codes)]"
+        if !notes.isEmpty { summary += " · 备注 \(notes.count) 条" }
+        return summary
     }
 }
 
@@ -208,7 +211,8 @@ enum DalvikSpider {
                                json: json,
                                requests: vm.httpLog,
                                steps: vm.stepCount,
-                               seconds: Date().timeIntervalSince(started))
+                               seconds: Date().timeIntervalSince(started),
+                               notes: vm.notes)
     }
 }
 

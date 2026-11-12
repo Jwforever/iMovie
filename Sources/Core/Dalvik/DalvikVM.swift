@@ -26,6 +26,15 @@ final class DalvikVM {
     private(set) var httpLog: [(url: String, code: Int)] = []
     /// 最近一次成功请求的地址；插件拼出 `?filter=true` 这类相对地址时用它补全。
     var baseURL: URL?
+    /// 解释器内部的异常 / 缺实现记录。插件自己 try/catch 吞掉异常后只回 `{}`，
+    /// 没有这份记录就看不出"为什么空"。
+    private(set) var notes: [String] = []
+
+    func note(_ message: String) {
+        guard notes.count < 40 else { return }
+        if notes.last == message { return }
+        notes.append(message)
+    }
 
     init(image: DalvikImage, control: DalvikExecutionControl = DalvikExecutionControl(),
          maximumSteps: Int = 20_000_000, timeout: TimeInterval = 45,
@@ -173,7 +182,9 @@ final class DalvikVM {
         if allowed.contains(where: { method.owner.hasPrefix($0) }) {
             return .ref(nil)
         }
-        throw DalvikError.java("缺少实现 \(method.owner)->\(method.name)(\(method.params.joined())) ← " + stackNames.suffix(3).joined(separator: " ← "))
+        let missing = "\(method.owner)->\(method.name)(\(method.params.joined()))"
+        note("缺实现 " + missing)
+        throw DalvikError.java("缺少实现 " + missing + " ← " + stackNames.suffix(3).joined(separator: " ← "))
     }
 
     func resolve(_ owner: String, _ name: String, _ params: [String], kind: String,
@@ -570,6 +581,7 @@ final class DalvikVM {
                                                      op, pc, method.owner, method.name))
                 }
             } catch let thrown as DalvikThrown {
+                note("捕获 \(thrown.object.className.split(separator: "/").last.map(String.init) ?? thrown.object.className) @ \(stackNames.suffix(2).joined(separator: " ← "))")
                 let table = image.handlers(code, pc: pc)
                 var handler: Int?
                 for (type, address) in table {
