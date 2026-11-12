@@ -1,16 +1,31 @@
 name: Plugin runtime diagnostics
 "on":
   workflow_dispatch:
+    inputs:
+      chain_keys:
+        description: "要端到端验证的来源 key（逗号分隔）"
+        required: false
+        default: "YGP,MTV1,点我切源"
+      broad_diagnostics:
+        description: "同时跑全量来源探测（较慢）"
+        required: false
+        default: "false"
 permissions:
   contents: read
 jobs:
   runtime:
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Runtime regression and live source diagnostics
-        run: swift test
+      - name: Chain test
+        run: swift test --filter PluginChainDiagnosticsTests
+        env:
+          IMOVIE_CHAIN_DIAGNOSTICS: "1"
+          IMOVIE_CHAIN_KEYS: ${{ github.event.inputs.chain_keys }}
+      - name: Broad source diagnostics
+        if: ${{ github.event.inputs.broad_diagnostics == 'true' }}
+        run: swift test --filter LivePluginDiagnosticsTests
         env:
           IMOVIE_SOURCE_DIAGNOSTICS: "1"
       - name: Save diagnostics
@@ -18,4 +33,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: plugin-source-diagnostics
-          path: dist/plugin-source-diagnostics.json
+          path: |
+            dist/plugin-source-diagnostics.json
+            dist/plugin-chain-report.json
