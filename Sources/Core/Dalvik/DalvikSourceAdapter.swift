@@ -55,7 +55,10 @@ enum CatVodPayload {
         guard let root = dictionary(raw), let items = root["list"] as? [[String: Any]],
               let item = items.first else { return nil }
         let id = text(item["vod_id"])
-        let name = text(item["vod_name"])
+        var name = text(item["vod_name"])
+        // 有些采集器的详情只有选集、没有名称，不能因为缺标题就整条丢掉。
+        if name.isEmpty { name = text(item["vod_play_from"]) }
+        if name.isEmpty { name = id }
         guard !name.isEmpty else { return nil }
         let playFrom = text(item["vod_play_from"])
         var playURL = text(item["vod_play_url"])
