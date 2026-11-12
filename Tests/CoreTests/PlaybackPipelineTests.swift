@@ -50,7 +50,7 @@ final class PlaybackPipelineTests: XCTestCase {
                 let play = try await Self.resolvePlayURL(site: site, spider: config.spider, ext: site.extensionValue)
                 let outcome = try await Self.fetchThroughProxy(play)
                 pipeline = Pipeline(key: site.key, title: play.title,
-                                    originalURL: String(play.url.prefix(160)),
+                                    originalURL: String(play.url.absoluteString.prefix(160)),
                                     ok: outcome.ok, detail: outcome.detail)
             } catch {
                 pipeline = Pipeline(key: site.key, title: "", originalURL: "",
