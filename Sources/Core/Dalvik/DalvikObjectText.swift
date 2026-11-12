@@ -10,6 +10,22 @@ extension DalvikNatives {
         case .ref(let object):
             guard let object else { return "null" }
             if let string = object.stringPayload { return string }
+            // JSON 对象必须输出 JSON，而不是 Java Map 的 {k=v} 形式，
+            // 否则插件自己回头解析时会对不上。
+            if object.className.hasSuffix("JSONObject;") || object.className.hasSuffix("JsonObject;") {
+                if let map = object.payload as? [String: DalvikValue] {
+                    return encode(map)
+                }
+            }
+            if object.className.hasSuffix("JSONArray;") || object.className.hasSuffix("JsonArray;") {
+                if let items = object.items {
+                    let plainItems = items.map { plain($0) }
+                    if let data = try? JSONSerialization.data(withJSONObject: plainItems, options: [.fragmentsAllowed]),
+                       let text = String(data: data, encoding: .utf8) {
+                        return text
+                    }
+                }
+            }
             if let map = object.payload as? [String: DalvikValue] {
                 let body = map.keys.sorted().map { "\($0)=\(javaText(vm, map[$0]))" }.joined(separator: ", ")
                 return "{" + body + "}"
