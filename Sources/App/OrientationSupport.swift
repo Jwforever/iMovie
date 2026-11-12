@@ -72,8 +72,16 @@ final class PlaybackOrientation: ObservableObject {
     }
 
     private func apply(_ mask: UIInterfaceOrientationMask) {
-        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        // AppDelegate 的 supportedInterfaceOrientationsFor 读这个掩码，
+        // 必须在请求几何更新之前改好，系统才会放行目标方向。
+        OrientationPolicy.mask = mask
+        let scenes = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { _ in }
+        // 部分系统版本 requestGeometryUpdate 不生效，补一次传统旋转请求。
+        let target: UIInterfaceOrientation = (mask == .portrait) ? .portrait : .landscapeRight
+        UIDevice.current.setValue(target.rawValue, forKey: "orientation")
+        UIViewController.attemptRotationToDeviceOrientation()
         isLandscape = mask == .landscapeRight || mask == .landscapeLeft || mask == .allButUpsideDown
     }
 }

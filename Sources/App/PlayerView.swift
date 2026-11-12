@@ -64,13 +64,26 @@ final class PlaybackController: ObservableObject {
             let url = try HTTPAddress.parse(media.url)
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try AVAudioSession.sharedInstance().setActive(true)
-            // mpv 直接播原始地址：tls-verify=no 免证书校验，头信息走 per-file option。
             let start = self.resume
             self.resume = 0
-            surface?.load(url: url.absoluteString, headers: media.headers, start: start)
+            let (target, headers) = Self.route(url: url, headers: media.headers)
+            surface?.load(url: target, headers: headers, start: start)
             onProgress?(media, position)
             lastRecordedAt = Date()
         } catch { self.error = error.localizedDescription }
+    }
+
+    /// 统一走已验证的本地回环代理（证书/头信息/m3u8 重写都在代理层消化）；
+    /// 代理未就绪时退回原始地址 + mpv 自带头（tls-verify 已关）。
+    private static func route(url: URL, headers: [String: String]) -> (target: String, headers: [String: String]) {
+        if let proxied = LocalStreamProxy.shared.mediaURL(for: url, headers: headers) {
+            return (proxied.absoluteString, [:])
+        }
+        var effective = headers
+        if !effective.keys.contains(where: { $0.lowercased() == "user-agent" }) {
+            effective["User-Agent"] = BrowserProfile.userAgent
+        }
+        return (url.absoluteString, effective)
     }
 
     /// 播放视图就绪后回填：把挂起的内容交给 mpv。
@@ -79,8 +92,12 @@ final class PlaybackController: ObservableObject {
         guard let media else { return }
         let start = resume
         resume = 0
-        let url = (try? HTTPAddress.parse(media.url))?.absoluteString ?? media.url
-        surface.load(url: url, headers: media.headers, start: start)
+        guard let url = try? HTTPAddress.parse(media.url) else {
+            surface.load(url: media.url, headers: media.headers, start: start)
+            return
+        }
+        let (target, headers) = Self.route(url: url, headers: media.headers)
+        surface.load(url: target, headers: headers, start: start)
     }
 
     // MARK: - mpv 事件（主线程）
